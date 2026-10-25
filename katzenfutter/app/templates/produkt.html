@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{# quelle = bearbeitetes Futter oder Vorlage; Sorte, EAN, Bestand und Status nie aus der Vorlage #}
+{% macro wert(feld, stellen=1) -%}
+  {%- if form is not none -%}{{ form.get(feld, '') }}
+  {%- elif quelle and quelle[feld] is not none -%}{{ quelle[feld] | de(stellen) }}
+  {%- endif -%}
+{%- endmacro %}
+{% macro text(feld, vorgabe='', uebernehmen=true) -%}
+  {%- set q = quelle if uebernehmen else p -%}
+  {%- if form is not none -%}{{ form.get(feld, '') }}
+  {%- elif q and q[feld] is not none -%}{{ q[feld] }}
+  {%- else -%}{{ vorgabe }}{%- endif -%}
+{%- endmacro %}
+{% macro auswahl(feld, optionen, vorgabe, uebernehmen=true) -%}
+  {%- set q = quelle if uebernehmen else p -%}
+  {%- set aktuell = form.get(feld) if form is not none else (q[feld] if q else vorgabe) -%}
+  <select id="{{ feld }}" name="{{ feld }}">
+    {% for wert_, text_ in optionen %}<option value="{{ wert_ }}" {% if wert_ | string == aktuell | string %}selected{% endif %}>{{ text_ }}</option>{% endfor %}
+  </select>
+{%- endmacro %}
+{% block inhalt %}
+<p><a class="link" href="futter">‹ Futter</a></p>
+<h1>{{ titel }}</h1>
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if vorlage and form is none %}<div class="meldung warn" role="status">Werte aus „{{ bezeichnung(vorlage) }}“ übernommen.
+  Sorte eintragen und Deklaration mit der Packung abgleichen – Sorten derselben Linie weichen oft ab.</div>{% endif %}
+
+{% if vorlagen and form is none and darf_aendern %}
+<form method="get" action="produkt">
+  {% if ean_vorbelegt %}<input type="hidden" name="ean" value="{{ ean_vorbelegt }}">{% endif %}
+  <div class="card">
+    <div class="row"><label for="vorlage">Werte übernehmen von</label>
+      <select id="vorlage" name="vorlage" onchange="this.form.submit()">
+        <option value="">keine Vorlage</option>
+        {% for v in vorlagen %}<option value="{{ v.id }}" {% if vorlage and vorlage.id == v.id %}selected{% endif %}>{{ bezeichnung(v) }}</option>{% endfor %}
+      </select></div>
+  </div>
+  <noscript><button type="submit" class="button sekundaer">Übernehmen</button></noscript>
+</form>
+{% endif %}
+
+<div class="meldung" id="ean-status" role="status" hidden></div>
+{% if not darf_aendern %}<div class="meldung muted" role="status">Nur Erwachsene können das ändern – ansehen geht.</div>{% endif %}
+<form method="post" action="produkt">
+  <fieldset {% if not darf_aendern %}disabled{% endif %} style="border: 0; padding: 0; margin: 0; min-width: 0;">
+  {% if p %}<input type="hidden" name="id" value="{{ p.id }}">{% endif %}
+  <h2>Produkt</h2>
+  <div class="card">
+    <div class="row"><label for="marke">Marke</label>
+      <input class="breit" type="text" id="marke" name="marke" required value="{{ text('marke') }}" placeholder="z. B. Animonda"></div>
+    <div class="row"><label for="linie">Linie</label>
+      <input class="breit" type="text" id="linie" name="linie" value="{{ text('linie') }}" placeholder="z. B. Carny"></div>
+    <div class="row"><label for="sorte">Sorte</label>
+      <input class="breit" type="text" id="sorte" name="sorte" required value="{{ text('sorte', uebernehmen=false) }}" placeholder="z. B. Rind + Pute"></div>
+    <div class="row"><label for="ean">EAN</label>
+      <input class="breit" type="text" inputmode="numeric" id="ean" name="ean" value="{{ text('ean', ean_vorbelegt, uebernehmen=false) }}" placeholder="optional"></div>
+    <div class="row" style="border-bottom: 0; padding-top: 0;"><span class="label"></span>
+      <button type="button" class="chip" id="ean-knopf">Daten zur EAN suchen</button></div>
+    <div class="row"><label for="futterart">Futterart</label>{{ auswahl('futterart', futterarten, 'allein') }}</div>
+    <div class="row"><label for="packung_g">Packung (g)</label>
+      <input type="text" inputmode="decimal" id="packung_g" name="packung_g" value="{{ wert('packung_g', 0) }}" placeholder="z. B. 85"></div>
+    <div class="row"><label for="packungstyp">Packungstyp</label>
+      <input type="text" id="packungstyp" name="packungstyp" value="{{ text('packungstyp') }}" placeholder="Schale, Dose …"></div>
+    <div class="row"><label for="stueck_g">Stückgewicht (g, Snacks)</label>
+      <input type="text" inputmode="decimal" id="stueck_g" name="stueck_g" value="{{ wert('stueck_g') }}" placeholder="optional"></div>
+  </div>
+
+  <h2>Deklaration (Analytische Bestandteile, %)</h2>
+  <details class="card" id="einfuegen-box" style="padding: 12px 16px; margin-bottom: 8px;">
+    <summary>Deklaration einfügen (Live Text vom iPhone)</summary>
+    <p class="note" style="margin: 8px 0;">Kamera oder Fotos öffnen, auf die Deklaration richten, Symbol „Live Text“ antippen,
+      den Block „Analytische Bestandteile“ markieren und „Kopieren“. Hier einfügen und übernehmen.</p>
+    <textarea id="einfuegen-text" rows="5" placeholder="Analytische Bestandteile: Protein 10 %, Fettgehalt 4,5 % …"
+      style="width: 100%; font: inherit; font-size: 15px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px;"></textarea>
+    <button type="button" class="button sekundaer" id="einfuegen-knopf">Werte übernehmen</button>
+  </details>
+  <div class="meldung" id="ocr-status" role="status" hidden></div>
+  <details class="card" id="ocr-text-box" hidden style="padding: 12px 16px; margin-bottom: 8px;">
+    <summary>Ausgewerteter Text</summary><pre id="ocr-text" style="white-space: pre-wrap; font-size: 13px; margin: 8px 0 0;"></pre>
+  </details>
+  <div class="card">
+    {% for feld, name in naehrstoffe %}
+    <div class="row"><label for="{{ feld }}">{{ name }}</label>
+      <input type="text" inputmode="decimal" id="{{ feld }}" name="{{ feld }}" value="{{ wert(feld) }}" placeholder="%"></div>
+    {% endfor %}
+    <div class="row"><label for="kcal_100g">Energie laut Hersteller (kcal/100 g)</label>
+      <input type="text" inputmode="decimal" id="kcal_100g" name="kcal_100g" placeholder="falls angegeben"
+             value="{% if form is not none %}{{ form.get('kcal_100g', '') }}{% elif quelle and quelle.kcal_herkunft == 'deklariert' %}{{ quelle.kcal_100g | de(1) }}{% endif %}"></div>
+  </div>
+  <p class="note">
+    {% if p and p.kcal_herkunft == 'berechnet' %}Berechnet: {{ p.kcal_100g | de(1) }} kcal/100 g (Atwater). {% endif %}
+    Ohne Herstellerangabe werden die kcal aus der vollständigen Deklaration berechnet und als „berechnet“ gekennzeichnet.
+  </p>
+
+  {% if vorliebe %}
+  <h2>Akzeptanz{% if alle_katzen and alle_katzen | length > 1 %} bei {{ katze.name }}{% endif %}</h2>
+  <div class="card">
+    <div class="row"><span class="label">Einstufung</span><span class="wert"><strong>
+      {%- if vorliebe.status == 'liebling' %}♥ {% elif vorliebe.status == 'abgelehnt' %}✕ {% endif %}{{ status_text[vorliebe.status] }}</strong></span></div>
+    <div class="row"><span class="label">Mahlzeiten mit Rest</span><span class="wert">{{ vorliebe.n }}{% if vorliebe.status == 'zu_wenig' %} von {{ liebling_n }}{% endif %}</span></div>
+    <div class="row"><span class="label">Ø gefressen</span><span class="wert">{{ (vorliebe.akzeptanz * 100) | de }} %</span></div>
+    {% if vorliebe.score is not none %}<div class="row"><span class="label">Score (gegen üblich)</span><span class="wert">{{ '%+.2f' | format(vorliebe.score) | replace('.', ',') }}</span></div>{% endif %}
+    {% if vorliebe.verweigert %}<div class="row"><span class="label">Verweigert</span><span class="wert">{{ vorliebe.verweigert }}×</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if tm %}
+  <h2>Auf Trockenmasse</h2>
+  <div class="card">
+    {% for feld, name in naehrstoffe if feld != 'feuchte' and tm[feld] is defined %}
+    <div class="row"><span class="label">{{ name }}</span><span class="wert">{{ tm[feld] | de(1) }} %</span></div>
+    {% endfor %}
+    {% if tm.nfe is defined %}<div class="row"><span class="label">NfE (Kohlenhydrate)</span><span class="wert">{{ tm.nfe | de(1) }} %</span></div>{% endif %}
+    {% if tm.kcal_100g is defined %}<div class="row"><span class="label">Energie</span><span class="wert">{{ tm.kcal_100g | de(0) }} kcal/100 g</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  <h2>Eigenschaften</h2>
+  <div class="card">
+    <div class="row"><label for="textur">Textur</label>
+      <input class="breit" type="text" id="textur" name="textur" value="{{ text('textur') }}" placeholder="Pastete, Stückchen …"></div>
+    <div class="row"><label for="proteine">Hauptproteine</label>
+      <input class="breit" type="text" id="proteine" name="proteine" value="{{ text('proteine') }}" placeholder="Rind, Pute"></div>
+    <div class="row"><label for="fleischanteil">Fleischanteil (%)</label>
+      <input type="text" inputmode="decimal" id="fleischanteil" name="fleischanteil" value="{{ wert('fleischanteil', 0) }}" placeholder="optional"></div>
+    <div class="row"><label for="getreidefrei">Getreidefrei</label>{{ auswahl('getreidefrei', [('', 'unbekannt'), (1, 'ja'), (0, 'nein')], '') }}</div>
+    <div class="row"><label for="zuckerfrei">Zuckerfrei</label>{{ auswahl('zuckerfrei', [('', 'unbekannt'), (1, 'ja'), (0, 'nein')], '') }}</div>
+    <div class="row"><label for="preis">Preis je Packung (€)</label>
+      <input type="text" inputmode="decimal" id="preis" name="preis" value="{{ wert('preis', 2) }}" placeholder="optional"></div>
+    <div class="row"><label for="status">Status</label>{{ auswahl('status', status, 'aktiv', uebernehmen=false) }}</div>
+  </div>
+
+  <h2>Bestand</h2>
+  <div class="card">
+    <div class="row"><label for="bestand_packungen">Volle Packungen</label>
+      <input type="text" inputmode="numeric" id="bestand_packungen" name="bestand_packungen"
+             value="{% if form is not none %}{{ form.get('bestand_packungen', '') }}{% elif p %}{{ p.packungen or 0 }}{% endif %}" placeholder="0"></div>
+    <div class="row"><label for="bestand_angebrochen_g">Angebrochen (g)</label>
+      <input type="text" inputmode="decimal" id="bestand_angebrochen_g" name="bestand_angebrochen_g"
+             value="{% if form is not none %}{{ form.get('bestand_angebrochen_g', '') }}{% elif p and p.angebrochen_g %}{{ p.angebrochen_g | de(0) }}{% endif %}" placeholder="0"></div>
+  </div>
+  <p class="note">„gesperrt“ nur nach eigener Entscheidung, z. B. wenn die Katze die Sorte dauerhaft ablehnt.</p>
+  {% if darf_aendern %}<button type="submit">Speichern</button>{% endif %}
+  </fieldset>
+</form>
+{% if darf_aendern and p and vorliebe and vorliebe.status == 'abgelehnt' and p.status == 'aktiv' %}
+<form method="post" action="sperren">
+  <input type="hidden" name="id" value="{{ p.id }}">
+  <button type="submit" class="button sekundaer" style="color: var(--err);">Sorte sperren (nicht mehr anbieten)</button>
+</form>
+<p class="note">Gesperrte Sorten erscheinen nicht mehr beim Füttern. Die Entscheidung trefft ihr, nicht das Add-on.</p>
+{% endif %}
+<style>
+  .aus-foto { background: color-mix(in srgb, var(--warn) 18%, transparent) !important; border-radius: 6px; padding: 0 6px !important; }
+</style>
+<script>
+  // Erkannte Werte nur vorbelegen und markieren – gespeichert wird erst mit „Speichern“.
+  const $ = id => document.getElementById(id);
+  const de = z => String(z).replace('.', ',');
+  function meldung(text, art) { const el = $('ocr-status'); el.hidden = false; el.className = 'meldung' + (art ? ' ' + art : ''); el.textContent = text; }
+  function setzen(feld, wert) {
+    const el = document.getElementById(feld);
+    if (!el) return false;
+    el.value = el.tagName === 'SELECT' ? String(wert) : de(wert);
+    el.classList.add('aus-foto');
+    return true;
+  }
+  // Produktdaten zur EAN: füllt nur leere Felder, markiert sie und speichert nichts
+  async function eanDaten(automatisch) {
+    const ean = $('ean').value.replace(/\s/g, '');
+    const status = $('ean-status');
+    const zeigen = (text, art) => { status.hidden = false; status.className = 'meldung' + (art ? ' ' + art : ''); status.textContent = text; };
+    if (!ean) { if (!automatisch) zeigen('Bitte zuerst eine EAN eintragen oder scannen.', 'err'); return; }
+    zeigen('Suche Produktdaten zur EAN …');
+    try {
+      const antwort = await (await fetch('ean_daten?ean=' + encodeURIComponent(ean))).json();
+      if (!antwort.ok) { zeigen(antwort.fehler, 'err'); return; }
+      const gesetzt = [];
+      for (const [feld, wert] of Object.entries(antwort.werte)) {
+        const el = document.getElementById(feld);
+        if (!el || (el.tagName !== 'SELECT' && el.value.trim())) continue;
+        if (setzen(feld, wert)) gesetzt.push(feld);
+      }
+      const deklaration = ['rohprotein', 'rohfett', 'rohasche', 'rohfaser', 'feuchte'].filter(f => f in antwort.werte).length;
+      if (!antwort.quelle) zeigen('Zu dieser EAN gibt es in Open Pet Food Facts keine Daten. Deklaration per Live Text einfügen oder eintippen.', 'warn');
+      else if (!gesetzt.length) zeigen('Aus ' + antwort.quelle + ': nichts Neues, alle Felder sind schon ausgefüllt.');
+      else zeigen(gesetzt.length + ' Felder aus ' + antwort.quelle + ' vorbelegt (markiert)'
+        + (deklaration < 5 ? ', Deklaration unvollständig – Rest per Live Text oder von Hand' : '') + '. Bitte prüfen, dann speichern.', 'warn');
+    } catch (fehler) { zeigen('Online-Abfrage fehlgeschlagen: ' + fehler.message, 'err'); }
+  }
+  $('ean-knopf').addEventListener('click', () => eanDaten(false));
+  {% if ean_vorbelegt and not p %}eanDaten(true);{% endif %}
+  $('einfuegen-knopf').addEventListener('click', async () => {
+    const fd = new FormData();
+    fd.append('text', $('einfuegen-text').value);
+    try { verarbeiten(await (await fetch('text_auswerten', { method: 'POST', body: fd })).json()); }
+    catch (fehler) { meldung('Fehler: ' + fehler.message, 'err'); }
+  });
+  function verarbeiten(antwort) {
+      if (!antwort.ok) { meldung(antwort.fehler, 'err'); return; }
+      const gesetzt = Object.entries(antwort.werte).filter(([feld, wert]) => setzen(feld, wert)).map(([feld]) => feld);
+      $('ocr-text').textContent = antwort.text; $('ocr-text-box').hidden = false;
+      const namen = { rohprotein: 'Rohprotein', rohfett: 'Rohfett', rohasche: 'Rohasche', rohfaser: 'Rohfaser', feuchte: 'Feuchte' };
+      const zweifel = Object.entries(antwort.zweifel || {});
+      let text = gesetzt.length
+        ? gesetzt.length + ' Werte vorbelegt (markiert). Bitte mit der Packung vergleichen, dann speichern.'
+        : 'Keine sicheren Werte erkannt. Bitte den Block „Analytische Bestandteile“ markieren – oder eintippen.';
+      if (zweifel.length) {
+        text += ' Unsicher gelesen, bitte von der Packung abtippen: '
+          + zweifel.map(([feld, stelle]) => (namen[feld] || feld) + ' („…' + stelle.slice(-16) + '“)').join(', ') + '.';
+        zweifel.forEach(([feld]) => { const el = document.getElementById(feld); if (el && !el.value) el.placeholder = 'bitte prüfen'; });
+      }
+      meldung(text, gesetzt.length ? 'warn' : 'err');
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% macro wert(feld, stellen=1) -%}
+  {%- if form is not none -%}{{ form.get(feld, '') }}
+  {%- elif katze[feld] is not none -%}{{ katze[feld] | de(stellen) }}
+  {%- endif -%}
+{%- endmacro %}
+{% block inhalt %}
+<h1>{{ katze.name }}</h1>
+
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if gespeichert %}<div class="meldung ok" role="status">Gespeichert.</div>{% endif %}
+
+<h2>Rechner</h2>
+<div class="card">
+  {% if r.hinweis %}
+    <div class="row"><span class="label">{{ r.hinweis }}</span></div>
+  {% else %}
+    <div class="row"><span class="label">Ruhebedarf (RER)</span><span class="wert">{{ r.rer | de }} kcal</span></div>
+    <div class="row"><span class="label">Tagesbedarf (MER, Faktor {{ katze.aktivitaetsfaktor | de(1) }})</span>
+      <span class="wert"><strong>{{ r.mer | de }} kcal</strong></span></div>
+    <div class="row"><span class="label">davon Snacks höchstens (10 %)</span><span class="wert">{{ r.snack_max | de }} kcal</span></div>
+    <div class="row"><span class="label">Wasser gesamt, Richtwert</span>
+      <span class="wert">{{ r.wasser[0] | de }}–{{ r.wasser[1] | de }} ml</span></div>
+    {% if r.kcal_snacks %}
+    <div class="row"><span class="label">Snacks heute (vom Hauptfutter abgezogen)</span><span class="wert">− {{ r.kcal_snacks | de }} kcal</span></div>
+    {% endif %}
+    {% if r.menge_g is defined %}
+    <div class="row"><span class="label">Futtermenge{% if gewaehlt %} {{ gewaehlt.sorte }}{% endif %} bei {{ kcal_100g | de(1) }} kcal/100 g</span>
+      <span class="wert"><strong>{{ r.menge_g | de }} g</strong>
+      {%- if r.packungen is defined %} · {{ r.packungen | de(1) }} × {{ packung_g | de }} g{% endif %}</span></div>
+    {% endif %}
+  {% endif %}
+</div>
+{% if not r.hinweis %}
+<form method="get" action="katze">
+  <div class="card">
+    {% if auswahl %}
+    <div class="row"><label for="produkt_id">Futter</label>
+      <select id="produkt_id" name="produkt_id">
+        <option value="">eigene Angabe</option>
+        {% for p in auswahl %}<option value="{{ p.id }}" {% if gewaehlt and gewaehlt.id == p.id %}selected{% endif %}>{{ bezeichnung(p) }}</option>{% endfor %}
+      </select></div>
+    {% endif %}
+    <div class="row"><label for="kcal_100g">Energie des Futters</label>
+      <input type="text" inputmode="decimal" id="kcal_100g" name="kcal_100g" placeholder="kcal/100 g"
+             value="{{ kcal_100g | de(1) if kcal_100g else '' }}"></div>
+    <div class="row"><label for="packung_g">Packungsgröße</label>
+      <input type="text" inputmode="decimal" id="packung_g" name="packung_g" placeholder="g"
+             value="{{ packung_g | de }}"></div>
+  </div>
+  <button type="submit">Menge berechnen</button>
+</form>
+<p class="note">Freigängerin: Beute und Fremdfutter sind nicht erfasst. Maßgeblich ist der Gewichtstrend,
+  nicht die Kalorienbilanz. Ist ein Futter gewählt, gelten dessen kcal und Packungsgröße.</p>
+{% endif %}
+
+{% if not darf_aendern %}<div class="meldung muted" role="status">Nur Erwachsene können das ändern – ansehen geht.</div>{% endif %}
+<form method="post" action="katze">
+  <fieldset {% if not darf_aendern %}disabled{% endif %} style="border: 0; padding: 0; margin: 0; min-width: 0;">
+  <input type="hidden" name="gewicht_vorher" value="{{ katze.gewicht_aktuell | de(2) if katze.gewicht_aktuell is not none else '' }}">
+  <h2>Profil</h2>
+  <div class="card">
+    <div class="row"><label for="name">Name</label>
+      <input type="text" id="name" name="name" required value="{{ form.get('name', '') if form is not none else katze.name }}"></div>
+    <div class="row"><label for="geburtsjahr">Geburtsjahr</label>
+      <input type="text" inputmode="numeric" id="geburtsjahr" name="geburtsjahr"
+             value="{{ form.get('geburtsjahr', '') if form is not none else (katze.geburtsjahr or '') }}"></div>
+    <div class="row"><label for="kastriert">Kastriert</label>
+      <input type="checkbox" id="kastriert" name="kastriert" value="1"
+             {% if (form.get('kastriert') if form is not none else katze.kastriert) %}checked{% endif %}></div>
+    <div class="row"><label for="freigang">Freigang</label>
+      <input type="checkbox" id="freigang" name="freigang" value="1"
+             {% if (form.get('freigang') if form is not none else katze.freigang) %}checked{% endif %}></div>
+  </div>
+
+  <h2>Gewicht und Bedarf</h2>
+  <div class="card">
+    <div class="row"><label for="gewicht_aktuell">Aktuelles Gewicht (kg)</label>
+      <input type="text" inputmode="decimal" id="gewicht_aktuell" name="gewicht_aktuell" placeholder="fehlt"
+             value="{{ wert('gewicht_aktuell', 2) }}"></div>
+    <div class="row"><label for="zielgewicht">Zielgewicht (kg)</label>
+      <input type="text" inputmode="decimal" id="zielgewicht" name="zielgewicht" placeholder="offen"
+             value="{{ wert('zielgewicht', 2) }}"></div>
+    <div class="row"><label for="bcs">BCS (1–9)</label>
+      <input type="text" inputmode="numeric" id="bcs" name="bcs" placeholder="offen"
+             value="{{ wert('bcs', 0) }}"></div>
+    <div class="row"><label for="aktivitaetsfaktor">Aktivitätsfaktor</label>
+      {% set aktuell = (form.get('aktivitaetsfaktor') | replace(',', '.') | float) if form is not none else katze.aktivitaetsfaktor %}
+      <select id="aktivitaetsfaktor" name="aktivitaetsfaktor">
+        {% for faktor, text in faktoren %}
+          <option value="{{ faktor }}" {% if (aktuell - faktor) | abs < 0.001 %}selected{% endif %}>{{ faktor | de(1) }} · {{ text }}</option>
+        {% endfor %}
+        {% if faktoren | selectattr(0, 'equalto', aktuell) | list | length == 0 %}
+          <option value="{{ aktuell }}" selected>{{ aktuell | de(2) }} · eigener Wert</option>
+        {% endif %}
+      </select></div>
+  </div>
+  <p class="note">
+    {% if letzte_wiegung %}Letzte Wiegung: {{ letzte_wiegung.kg | de(2) }} kg.{% endif %}
+    Zielgewicht und BCS legt der Tierarzt fest; bis dahin „offen“. Faktor konservativ wählen, nie automatisch erhöhen.
+  </p>
+  <h2>PetKit (Katzenklo)</h2>
+  <div class="card">
+    <div class="row"><label for="petkit_besuch_entity">Sensor letzter Toilettengang</label>
+      <input class="breit" type="text" id="petkit_besuch_entity" name="petkit_besuch_entity" list="vorschlag-besuch"
+             autocomplete="off" placeholder="sensor.…" value="{{ form.get('petkit_besuch_entity', '') if form is not none else (katze.petkit_besuch_entity or '') }}"></div>
+    <div class="row"><label for="petkit_gewicht_entity">Sensor Gewicht je Toilettengang</label>
+      <input class="breit" type="text" id="petkit_gewicht_entity" name="petkit_gewicht_entity" list="vorschlag-gewicht"
+             autocomplete="off" placeholder="sensor.…" value="{{ form.get('petkit_gewicht_entity', '') if form is not none else (katze.petkit_gewicht_entity or '') }}"></div>
+    {% if katze.petkit_besuch_entity or katze.petkit_gewicht_entity %}
+    <div class="row"><span class="label muted" style="font-size: 14px;">Übernommen: {{ petkit_stand.gaenge_24h }} Toilettengänge (24 h),
+      {{ petkit_stand.wiegungen_7t }} Wiegungen (7 Tage){% if katze.petkit_abgleich %} · Abgleich alle 5 Minuten{% endif %}</span></div>
+    {% endif %}
+  </div>
+  <datalist id="vorschlag-besuch">{% for eid, name in petkit_vorschlaege[0] %}<option value="{{ eid }}">{{ name }}</option>{% endfor %}</datalist>
+  <datalist id="vorschlag-gewicht">{% for eid, name in petkit_vorschlaege[1] %}<option value="{{ eid }}">{{ name }}</option>{% endfor %}</datalist>
+  <p class="note">Sensoren der PetKit-Integration, sobald das Klo eingerichtet ist. Nicht das Profilgewicht
+    (number.…), sondern der Sensor mit dem gemessenen Gewicht. Ausreißer über 5 % zum 7-Tage-Median werden verworfen.</p>
+  {% if darf_aendern %}<button type="submit">Speichern</button>{% endif %}
+  </fieldset>
+</form>
+
+<h2>Katzen im Haushalt</h2>
+{% if fehler_neu == 1 %}<div class="meldung err" role="alert">Bitte einen Namen mit höchstens 40 Zeichen eingeben.</div>{% endif %}
+{% if fehler_neu == 2 %}<div class="meldung err" role="alert">Eine Katze mit diesem Namen gibt es schon.</div>{% endif %}
+{% if entfernt == '1' %}<div class="meldung ok" role="status">Katze ausgeblendet. Ihre Daten bleiben gespeichert.</div>{% endif %}
+<div class="card">
+  {% for k in katzen %}
+  <div class="row"><span class="label">{{ k.name }}{% if k.id == katze.id %} <span class="tag">angezeigt</span>{% endif %}</span>
+    {% if katzen | length > 1 and darf_aendern %}
+    <form method="post" action="katze_entfernen" style="margin: 0;" onsubmit="return confirm({{ (k.name ~ ' ausblenden? Die Daten bleiben gespeichert.') | tojson | forceescape }});">
+      <input type="hidden" name="id" value="{{ k.id }}">
+      <button type="submit" class="chip" style="color: var(--err);">Ausblenden</button>
+    </form>
+    {% endif %}</div>
+  {% endfor %}
+</div>
+{% if darf_aendern %}
+<form method="post" action="katze_neu">
+  <div class="card">
+    <div class="row"><label for="neu_name">Weitere Katze</label>
+      <input class="breit" type="text" id="neu_name" name="name" maxlength="40" placeholder="Name" required></div>
+  </div>
+  <button type="submit" class="button sekundaer">Katze anlegen</button>
+</form>
+{% endif %}
+<p class="note">Futter und Bestand teilen sich alle Katzen; Mahlzeiten, Snacks, Gesundheit, Gewicht und Vorlieben
+  werden je Katze geführt. Ab zwei Katzen steht oben auf Heute, Füttern, Futter, Verlauf und hier ein Umschalter „Katze“.</p>
+
+<h2>Haushalt</h2>
+<a class="button sekundaer" href="einstellungen">Einstellungen: Personen, Snack-Limit, Schwellen</a>
+<p class="note">Angemeldet als {{ user }}.</p>
+{% endblock %}

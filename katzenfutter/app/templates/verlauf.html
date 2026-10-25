@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>Verlauf</h1>
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if gespeichert %}<div class="meldung ok" role="status">Gewicht gespeichert.</div>{% endif %}
+{% for text in gewicht.hinweise %}
+<div class="meldung warn" role="alert"><strong>Hinweis:</strong> {{ text }}</div>
+{% endfor %}
+
+<nav class="zeitraum" aria-label="Zeitraum">
+  {% for t in auswahl %}<a class="chip" href="verlauf?tage={{ t }}" {% if t == tage %}aria-pressed="true" aria-current="true"{% endif %}>{{ t }} Tage</a>{% endfor %}
+</nav>
+
+<div class="viz">
+<svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+  <defs><pattern id="schraffur" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="6" height="6" class="schraffur-grund"/><line x1="0" y1="0" x2="0" y2="6" class="schraffur-linie"/>
+  </pattern></defs>
+</svg>
+<h2>Gewicht</h2>
+<div class="card diagramm">
+  {% if g_diagramm %}
+  {% set d = g_diagramm %}
+  <svg viewBox="0 0 {{ d.breite }} {{ d.hoehe }}" role="img" aria-label="Gewicht: Tageswerte und 7-Tage-Trend">
+    {% for y, wert in d.yticks %}
+    <line x1="{{ d.rand.links }}" x2="{{ d.breite - d.rand.rechts }}" y1="{{ y }}" y2="{{ y }}" class="gitter"/>
+    <text x="{{ d.rand.links - 6 }}" y="{{ y + 4 }}" class="achse" text-anchor="end">{{ wert | de(2) }}</text>
+    {% endfor %}
+    {% for x, text in d.xticks %}<text x="{{ x }}" y="{{ d.hoehe - 8 }}" class="achse" text-anchor="middle">{{ text }}</text>{% endfor %}
+    {% if d.linie %}<polyline points="{{ d.linie }}" class="trend"/>{% endif %}
+    {% for p in d.punkte %}
+    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="4.5" class="punkt"/>
+    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="14" class="treffer" tabindex="0"
+            data-tip="{{ p.tag.strftime('%d.%m.') }}: {{ p.kg | de(2) }} kg"/>
+    {% endfor %}
+  </svg>
+  <div class="legende"><span><i class="marke punkt-m"></i>Tageswert (Median)</span><span><i class="marke linie-m"></i>Trend 7 Tage</span></div>
+  {% else %}
+  <p class="muted">Noch keine Wiegung in diesem Zeitraum.</p>
+  {% endif %}
+</div>
+
+{% if darf_aendern %}
+<form method="post" action="verlauf">
+  <input type="hidden" name="tage" value="{{ tage }}">
+  <div class="card">
+    <div class="row"><label for="kg">Gewicht (kg)</label>
+      <input type="text" inputmode="decimal" id="kg" name="kg" placeholder="z. B. 4,2" required></div>
+    <div class="row"><label for="datum">Datum</label>
+      <input type="date" id="datum" name="datum" value="{{ heute }}" max="{{ heute }}"
+             style="font: inherit; color: var(--text); background: transparent; border: 0; min-height: 44px;"></div>
+  </div>
+  <button type="submit">Gewicht eintragen</button>
+</form>
+{% endif %}
+{% if wiegungen %}
+<details class="card" style="padding: 12px 16px;">
+  <summary>Letzte Wiegungen</summary>
+  {% for w in wiegungen %}
+  <div class="row"><span class="label">{{ w.zeit | datum }} {{ w.zeit | uhrzeit }} · {{ 'PetKit' if w.quelle == 'petkit' else 'von Hand' }}<br>
+    <span class="{{ 'muted' if w.verworfen }}" style="font-size: 15px;">{{ w.kg | de(2) }} kg{% if w.verworfen %} · verworfen{% endif %}</span></span>
+    {% if darf_aendern %}<form method="post" action="wiegung_umschalten" style="margin: 0;">
+      <input type="hidden" name="id" value="{{ w.id }}"><input type="hidden" name="tage" value="{{ tage }}">
+      <button type="submit" class="chip">{{ 'Zulassen' if w.verworfen else 'Verwerfen' }}</button>
+    </form>{% endif %}</div>
+  {% endfor %}
+</details>
+{% endif %}
+<p class="note">Freigängerin: maßgeblich ist der Gewichtstrend, nicht die Kalorienbilanz. Am besten etwa wöchentlich
+  zur gleichen Tageszeit wiegen.</p>
+
+<h2>Energie je Tag</h2>
+<div class="card diagramm">
+  {% if k_diagramm %}
+  {% set d = k_diagramm %}
+  <svg viewBox="0 0 {{ d.breite }} {{ d.hoehe }}" role="img" aria-label="Gefressene kcal je Tag, Futter und Snacks">
+    {% for y, wert in d.yticks %}
+    <line x1="{{ d.rand.links }}" x2="{{ d.breite - d.rand.rechts }}" y1="{{ y }}" y2="{{ y }}" class="gitter"/>
+    <text x="{{ d.rand.links - 6 }}" y="{{ y + 4 }}" class="achse" text-anchor="end">{{ wert | de }}</text>
+    {% endfor %}
+    {% for x, text in d.xticks %}<text x="{{ x }}" y="{{ d.hoehe - 8 }}" class="achse" text-anchor="middle">{{ text }}</text>{% endfor %}
+    {% for b in d.balken %}
+      {% if b.h_futter > 0 %}<rect x="{{ b.x }}" y="{{ b.y_futter }}" width="{{ b.w }}" height="{{ b.h_futter }}" rx="2" class="futter {{ 'geschaetzt-m' if b.geschaetzt }}"/>{% endif %}
+      {% if b.h_snack > 0 %}<rect x="{{ b.x }}" y="{{ b.y_snack }}" width="{{ b.w }}" height="{{ b.h_snack }}" rx="2" class="snack"/>{% endif %}
+      <rect x="{{ b.x - 3 }}" y="{{ d.rand.oben }}" width="{{ b.w + 6 }}" height="{{ d.null_y - d.rand.oben }}" class="treffer" tabindex="0"
+            data-tip="{{ b.tag.strftime('%d.%m.') }}: Futter {{ '≈ ' if b.geschaetzt }}{{ b.futter | de }} kcal · Snacks {{ b.snacks | de }} kcal{% if b.offen %} · {{ b.offen }} Rest offen{% endif %}"/>
+    {% endfor %}
+    {% if d.mer_y %}
+    <line x1="{{ d.rand.links }}" x2="{{ d.breite - d.rand.rechts }}" y1="{{ d.mer_y }}" y2="{{ d.mer_y }}" class="bedarf"/>
+    <text x="{{ d.breite - d.rand.rechts }}" y="{{ d.mer_y - 5 }}" class="achse" text-anchor="end">Bedarf {{ d.mer | de }}</text>
+    {% endif %}
+  </svg>
+  <div class="legende"><span><i class="marke futter-m"></i>Futter</span><span><i class="marke snack-m"></i>Snacks</span>
+    <span><i class="marke bedarf-m"></i>Bedarf aktuell</span></div>
+  <p class="note" style="margin: 4px 0 8px;">Schraffiert: Rest teils geschätzt. Mahlzeiten mit offenem Rest zählen nicht mit.</p>
+  {% else %}
+  <p class="muted">Noch keine erfassten Mahlzeiten in diesem Zeitraum.</p>
+  {% endif %}
+</div>
+
+<details class="card" style="padding: 12px 16px;">
+  <summary>Tabelle</summary>
+  <table class="vergleich" style="margin-top: 8px;">
+    <tr><th>Tag</th><th>Futter</th><th>Snacks</th><th>Gewicht</th></tr>
+    {% for t in kcal | reverse %}
+    <tr><td>{{ t.tag.strftime('%d.%m.') }}</td>
+      <td>{% if t.futter %}{{ '≈ ' if t.geschaetzt }}{{ t.futter | de }}{% else %}–{% endif %}{% if t.offen %} <span class="muted">(+{{ t.offen }} offen)</span>{% endif %}</td>
+      <td>{{ t.snacks | de if t.snacks else '–' }}</td>
+      <td>{{ gewicht.mediane[t.tag] | de(2) if t.tag in gewicht.mediane else '–' }}</td></tr>
+    {% endfor %}
+  </table>
+</details>
+
+<a class="button sekundaer" href="kosten">Futterkosten</a>
+
+{% if ereignisse %}
+<h2>Gesundheit</h2>
+<div class="card">
+  {% for e in ereignisse %}
+  <div class="row"><span class="label">{{ e.zeit | datum }} {{ e.zeit | uhrzeit }} · {{ typ_text[e.typ] }}{% if e.sorte %} · nach {{ e.sorte }}{% endif %}</span></div>
+  {% endfor %}
+</div>
+{% endif %}
+</div>
+
+<div id="tip" class="tip" role="tooltip" hidden></div>
+
+<style>
+  .viz { --series-1: #2a78d6; --series-2: #eb6834; --raster: #d1d1d6; --achse: #6e6e73; }
+  @media (prefers-color-scheme: dark) { .viz { --series-1: #3987e5; --series-2: #d95926; --raster: #38383a; --achse: #98989f; } }
+  .zeitraum { display: flex; gap: 8px; margin-bottom: 4px; }
+  .zeitraum .chip { text-decoration: none; display: inline-flex; align-items: center; }
+  .diagramm { padding: 12px 8px 4px; }
+  .diagramm svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .gitter { stroke: var(--raster); stroke-width: 1; }
+  .achse { fill: var(--achse); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .trend { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .punkt { fill: var(--series-1); stroke: var(--card); stroke-width: 2; }
+  .futter { fill: var(--series-1); }
+  .futter.geschaetzt-m { fill: url(#schraffur); }
+  .snack { fill: var(--series-2); }
+  .schraffur-grund { fill: var(--series-1); opacity: 0.4; }
+  .schraffur-linie { stroke: var(--series-1); stroke-width: 3; }
+  .bedarf { stroke: var(--achse); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .treffer { fill: transparent; cursor: pointer; }
+  .treffer:focus { outline: none; stroke: var(--achse); stroke-width: 1; }
+  .legende { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); padding: 6px 8px 8px; }
+  .marke { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 3px; }
+  .punkt-m { background: var(--series-1); border-radius: 50%; }
+  .linie-m { height: 2px; vertical-align: 3px; background: var(--series-1); }
+  .futter-m { background: var(--series-1); }
+  .snack-m { background: var(--series-2); }
+  .bedarf-m { height: 0; border-top: 2px dashed var(--achse); vertical-align: 3px; border-radius: 0; }
+  .tip { position: fixed; z-index: 10; background: var(--text); color: var(--bg); font-size: 13px; padding: 6px 10px;
+         border-radius: 8px; pointer-events: none; max-width: 260px; }
+  details summary { cursor: pointer; min-height: 32px; color: var(--accent); }
+</style>
+<script>
+  // Hinweis beim Überfahren oder Antippen von Punkten und Balken
+  const tip = document.getElementById('tip');
+  function zeigen(el, x, y) {
+    tip.textContent = el.dataset.tip; tip.hidden = false;
+    const b = tip.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(window.innerWidth - b.width - 8, x - b.width / 2)) + 'px';
+    tip.style.top = Math.max(8, y - b.height - 12) + 'px';
+  }
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('pointerenter', e => zeigen(el, e.clientX, e.clientY));
+    el.addEventListener('pointermove', e => zeigen(el, e.clientX, e.clientY));
+    el.addEventListener('pointerleave', () => { tip.hidden = true; });
+    el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); zeigen(el, r.left + r.width / 2, r.top); });
+    el.addEventListener('blur', () => { tip.hidden = true; });
+  });
+</script>
+{% endblock %}

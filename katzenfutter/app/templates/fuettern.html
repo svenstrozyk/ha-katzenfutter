@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>Füttern</h1>
+
+{% if gespeichert %}
+<div class="meldung ok" role="status">
+  Gefüttert: {{ gespeichert.angeboten_g | gramm }} g {{ gespeichert.sorte }} um {{ gespeichert.zeit | uhrzeit }}.
+  {% for h in hinweise %}<br><span class="warn">{{ h }}</span>{% endfor %}
+  {% if rueckgaengig %}
+  <form method="post" action="rueckgaengig" style="margin: 0;">
+    <input type="hidden" name="mahlzeit_id" value="{{ gespeichert.id }}">
+    <button type="submit" class="button sekundaer" style="margin-bottom: 0;">Rückgängig</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% if zurueckgenommen == '1' %}<div class="meldung ok" role="status">Eintrag zurückgenommen, Bestand wiederhergestellt.</div>{% endif %}
+{% if zurueckgenommen == '0' %}<div class="meldung err" role="alert">Zurücknehmen nicht mehr möglich (nur die letzte Mahlzeit einer Sorte, bis 30 Minuten).</div>{% endif %}
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if geloescht == 'mit_bestand' %}<div class="meldung ok" role="status">Mahlzeit gelöscht, Bestand wiederhergestellt.</div>{% endif %}
+{% if geloescht == 'ohne_bestand' %}<div class="meldung warn" role="status">Mahlzeit gelöscht. Danach wurde dieselbe Sorte noch einmal gefüttert –
+  bitte den Bestand im Tab Futter prüfen.</div>{% endif %}
+{% if rest_erfasst %}<div class="meldung ok" role="status">Rest gespeichert: {{ rest_erfasst.sorte }},
+  gefressen {{ '≈ ' if rest_erfasst.rest_herkunft == 'geschaetzt' }}{{ rest_erfasst.gefressen_g | gramm }} g
+  ({{ 'geschätzt' if rest_erfasst.rest_herkunft == 'geschaetzt' else 'gewogen' }}){% if rest_erfasst.verweigert %}, verweigert{% endif %}.</div>{% endif %}
+
+{% if offene %}
+<h2>Rest eintragen</h2>
+{% for m in offene %}
+<div class="card" style="padding-bottom: 12px;">
+  <div class="row"><span class="label">{{ m.zeit | uhrzeit }} · {{ m.sorte }}<br>
+    <span class="muted" style="font-size: 14px;">{{ m.angeboten_g | gramm }} g angeboten · {{ m.person or 'unbekannt' }}</span></span>
+    <a class="link" href="rest?id={{ m.id }}">Wiegen …</a></div>
+  <form method="post" action="rest" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 0;">
+    <input type="hidden" name="id" value="{{ m.id }}">
+    {% for stufe, text in stufen %}
+    <button type="submit" name="stufe" value="{{ stufe }}" class="chip">{{ text }}</button>
+    {% endfor %}
+  </form>
+</div>
+{% endfor %}
+<p class="note">Rest geschätzt: Nichts 0 %, Wenig 10 %, Hälfte 50 %, Viel 75 %, Unberührt 100 %.
+  „Wiegen …“ für gewogenen Rest oder „verweigert“.</p>
+{% endif %}
+
+{% if not auswahl %}
+<div class="meldung muted">Noch kein Futter angelegt. <a class="link" href="scan?ziel=fuettern">Barcode scannen</a>
+  oder im Tab <a class="link" href="futter">Futter</a> anlegen.</div>
+<a class="button sekundaer" href="snack">Snack geben</a>
+<a class="button sekundaer" href="gesundheit">Erbrechen, Durchfall … melden</a>
+{% else %}
+<form method="post" action="fuettern" id="fuetterung">
+  <h2>Futter</h2>
+  <div class="card">
+    {% set gewaehlt = (form.get('produkt_id') | int) if form is not none else gewaehlt_id %}
+    {% for p in auswahl %}
+    <label class="row" style="cursor: pointer;">
+      <span class="label">{{ bezeichnung(p) }}<br><span class="muted" style="font-size: 14px;">
+        {% if p.angebrochen_g %}angebrochen {{ p.angebrochen_g | gramm }} g · {% endif %}{{ p.packungen or 0 }} {{ 'Packung' if (p.packungen or 0) == 1 else 'Packungen' }}
+        {%- if p.packung_g %} à {{ p.packung_g | gramm }} g{% endif %}</span></span>
+      <input type="radio" name="produkt_id" value="{{ p.id }}" style="width: 24px; height: 24px; accent-color: var(--accent);"
+             data-packung="{{ p.packung_g or '' }}" data-angebrochen="{{ p.angebrochen_g or '' }}"
+             {% if p.id == gewaehlt %}checked{% endif %}>
+    </label>
+    {% endfor %}
+  </div>
+  <a class="button sekundaer" href="scan?ziel=fuettern">Barcode scannen</a>
+
+  <h2>Menge</h2>
+  <div class="card">
+    <div class="row" id="schnellwahl" style="flex-wrap: wrap; justify-content: flex-start; gap: 8px;"></div>
+    <div class="row"><label for="menge_g">Angeboten (g)</label>
+      <input type="text" inputmode="decimal" id="menge_g" name="menge_g" required placeholder="g"
+             value="{{ form.get('menge_g', '') if form is not none else '' }}"></div>
+    <div class="row"><label for="person">Gefüttert von</label>
+      <select id="person" name="person">
+        {% for name in personen %}<option value="{{ name }}" {% if name == ((form.get('person') if form is not none else vorbelegt)) %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select></div>
+    <div class="row"><label for="uhrzeit">Uhrzeit (leer = jetzt)</label>
+      <input type="time" id="uhrzeit" name="uhrzeit" value="{{ form.get('uhrzeit', '') if form is not none else '' }}"
+             style="font: inherit; color: var(--text); background: transparent; border: 0; min-height: 44px;"></div>
+  </div>
+  <button type="submit">Gefüttert</button>
+  <a class="button sekundaer" href="snack">Snack geben</a>
+  <a class="button sekundaer" href="gesundheit">Erbrechen, Durchfall … melden</a>
+  <p class="note">Eingetragen von {{ user }}. Den Rest danach oben unter „Rest eintragen“ erfassen.</p>
+</form>
+{% endif %}
+
+{% if heute %}
+<h2>Heute</h2>
+<div class="card">
+  {% for m in heute %}
+  <a class="row zeile" href="rest?id={{ m.id }}"><span class="label">{{ m.zeit | uhrzeit }} · {{ m.sorte }}<br>
+    <span class="muted" style="font-size: 14px;">{{ m.person or 'unbekannt' }} · {{ m.angeboten_g | gramm }} g angeboten</span></span>
+    <span class="wert">
+      {%- if m.rest_g is none %}<span class="muted">Rest offen</span>
+      {%- elif m.rest_herkunft == 'geschaetzt' %}<span class="geschaetzt">≈ {{ m.gefressen_g | gramm }} g</span><br><span class="muted" style="font-size: 13px;">geschätzt</span>
+      {%- else %}{{ m.gefressen_g | gramm }} g<br><span class="muted" style="font-size: 13px;">gewogen</span>{% endif %}
+      {%- if m.verweigert %}<br><span class="warn" style="font-size: 13px;">verweigert</span>{% endif %}
+    </span></a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .warn { color: var(--warn); }
+  .geschaetzt { font-style: italic; }
+</style>
+<script>
+  // Schnellwahl der Menge passend zum gewählten Futter; ohne JavaScript bleibt das Eingabefeld
+  const feld = document.getElementById('menge_g');
+  const leiste = document.getElementById('schnellwahl');
+  const de = z => (Math.round(z * 10) / 10).toString().replace('.', ',');
+  function schnellwahl(vorbelegen) {
+    const radio = document.querySelector('input[name=produkt_id]:checked');
+    if (!radio || !leiste) return;
+    const packung = parseFloat(radio.dataset.packung), angebrochen = parseFloat(radio.dataset.angebrochen);
+    const optionen = [];
+    if (angebrochen > 0) optionen.push(['Rest angebrochen · ' + de(angebrochen) + ' g', angebrochen]);
+    if (packung > 0) {
+      optionen.push(['½ Packung · ' + de(packung / 2) + ' g', packung / 2]);
+      optionen.push(['1 Packung · ' + de(packung) + ' g', packung]);
+    }
+    leiste.innerHTML = '';
+    leiste.hidden = optionen.length === 0;
+    for (const [text, wert] of optionen) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = text;
+      b.setAttribute('aria-pressed', de(wert) === feld.value ? 'true' : 'false');
+      b.addEventListener('click', () => { feld.value = de(wert); schnellwahl(false); });
+      leiste.appendChild(b);
+    }
+    if (vorbelegen && optionen.length) { feld.value = de(optionen[0][1]); schnellwahl(false); }
+  }
+  document.querySelectorAll('input[name=produkt_id]').forEach(r => r.addEventListener('change', () => schnellwahl(true)));
+  feld && feld.addEventListener('input', () => schnellwahl(false));
+  if (feld) schnellwahl(!feld.value);
+</script>
+{% endblock %}

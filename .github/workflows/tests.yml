@@ -1,0 +1,19 @@
+# Tests mit derselben Python-Version wie im Container (python:3.12-alpine)
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Abhängigkeiten
+        run: pip install -r katzenfutter/requirements.txt pytest==8.3.3
+      - name: pytest
+        run: pytest -q

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<p><a class="link" href="fuettern">‹ Füttern</a></p>
+<h1>Rest</h1>
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+
+<div class="card">
+  <div class="row"><span class="label">{{ bezeichnung(m) }}</span></div>
+  {% if alle_katzen and alle_katzen | length > 1 %}<div class="row"><span class="label">Katze</span><span class="wert">{{ katze_name }}</span></div>{% endif %}
+  <div class="row"><span class="label">Gefüttert</span><span class="wert">{{ m.zeit | uhrzeit }} · {{ m.person or 'unbekannt' }}</span></div>
+  <div class="row"><span class="label">Angeboten</span><span class="wert">{{ m.angeboten_g | gramm }} g</span></div>
+  {% if m.rest_g is not none %}
+  <div class="row"><span class="label">Bisher erfasst</span><span class="wert">
+    Rest {{ '≈ ' if m.rest_herkunft == 'geschaetzt' }}{{ m.rest_g | gramm }} g
+    ({{ 'geschätzt' if m.rest_herkunft == 'geschaetzt' else 'gewogen' }}){% if m.verweigert %}, verweigert{% endif %}</span></div>
+  {% endif %}
+</div>
+
+<h2>Gewogen</h2>
+<form method="post" action="rest">
+  <input type="hidden" name="id" value="{{ m.id }}">
+  <div class="card">
+    <div class="row"><label for="rest_g">Rest im Napf (g, ohne Napf)</label>
+      <input type="text" inputmode="decimal" id="rest_g" name="rest_g" placeholder="g"
+             value="{{ m.rest_g | gramm if m.rest_herkunft == 'gewogen' else '' }}"></div>
+    <div class="row"><label for="verweigert-gewogen">Verweigert (geschnuppert, abgelehnt)</label>
+      <input type="checkbox" id="verweigert-gewogen" name="verweigert" value="1" {% if m.verweigert %}checked{% endif %}></div>
+  </div>
+  <button type="submit">Gewogenen Rest speichern</button>
+</form>
+
+<h2>Geschätzt</h2>
+<form method="post" action="rest">
+  <input type="hidden" name="id" value="{{ m.id }}">
+  <div class="card" style="padding: 12px 16px;">
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      {% for stufe, text in stufen %}
+      <button type="submit" name="stufe" value="{{ stufe }}" class="chip">{{ text }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</form>
+<form method="post" action="rest">
+  <input type="hidden" name="id" value="{{ m.id }}">
+  <input type="hidden" name="stufe" value="unberuehrt">
+  <input type="hidden" name="verweigert" value="1">
+  <button type="submit" class="button sekundaer">Verweigert – nicht angerührt</button>
+</form>
+<p class="note">„Unberührt“: nicht gefressen, z. B. weil sie draußen war. „Verweigert“: hat geschnuppert und abgelehnt –
+  zählt für die Erkennung „wird nicht gemocht“. Gewogene Werte sind genauer und zählen in der Auswertung stärker.</p>
+
+{% if darf_aendern %}
+<h2>Falsch eingetragen?</h2>
+<form method="post" action="mahlzeit_loeschen" onsubmit="return confirm('Diese Mahlzeit löschen?');">
+  <input type="hidden" name="id" value="{{ m.id }}">
+  <button type="submit" class="button sekundaer" style="color: var(--err);">Mahlzeit löschen</button>
+</form>
+<p class="note">Ist es die letzte Mahlzeit dieser Sorte, wird der Bestand wiederhergestellt; sonst bitte den Bestand im Tab Futter prüfen.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,6 @@
+flask==3.0.3
+gunicorn==23.0.0
+requests==2.32.3
+tzdata==2026.4
+paho-mqtt==2.1.0
+websocket-client==1.9.2

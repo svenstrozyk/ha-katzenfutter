@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.DS_Store
+# lokale Testdaten
+data/
+*.db
+# lokale Plugin-Daten
+.raven/
+# lokale Werkzeug-Caches
+.impeccable/
+# interne Projektnotizen (nicht öffentlich)
+CLAUDE.md
+docs/MVP-PLAN.md
+memory/
+# lokale Sicherung der alten Git-Historie
+*.bundle

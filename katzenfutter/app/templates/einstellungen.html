@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<p><a class="link" href="katze">‹ Katzen</a></p>
+<h1>Einstellungen</h1>
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if gespeichert %}<div class="meldung ok" role="status">Gespeichert.</div>{% endif %}
+{% if not darf %}<div class="meldung warn" role="status">Nur Erwachsene können die Einstellungen ändern.</div>{% endif %}
+
+<form method="post" action="einstellungen">
+  <fieldset {% if not darf %}disabled{% endif %} style="border: 0; padding: 0; margin: 0;">
+  <h2>Haushalt</h2>
+  {% set zeilen = einst.personen + [{'name': '', 'rolle': 'erwachsen' if not einst.personen else 'kind', 'ha_name': ''}] %}
+  {% for p in zeilen %}
+  <div class="card person{% if not p.name %} neu{% endif %}">
+    <div class="row"><label for="name{{ loop.index }}">Name</label>
+      <input class="breit" type="text" id="name{{ loop.index }}" name="name" value="{{ p.name }}"
+             placeholder="{{ 'Neue Person' if not p.name else '' }}"></div>
+    <div class="row"><label for="rolle{{ loop.index }}">Rolle</label>
+      <select id="rolle{{ loop.index }}" name="rolle">
+        {% for wert, text in rollen %}<option value="{{ wert }}" {% if p.rolle == wert %}selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select></div>
+    <div class="row"><label for="ha{{ loop.index }}">HA-Benutzer</label>
+      <input class="breit" type="text" id="ha{{ loop.index }}" name="ha_name" value="{{ p.ha_name }}" placeholder="falls abweichend"></div>
+    {% if p.name %}
+    <div class="row" style="justify-content: flex-end;">
+      <button type="button" class="chip entfernen" style="color: var(--err);" data-name="{{ p.name }}">Entfernen</button></div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div class="meldung warn" id="entfernt-hinweis" role="status" hidden></div>
+  <button type="button" class="button sekundaer" id="person-plus" hidden>Weitere Person</button>
+  <p class="note">Angemeldet als „{{ user }}“{% if benutzername and benutzername | lower != user | lower %} (Benutzername „{{ benutzername }}“){% endif %}
+    {%- if zugeordnet %} – erkannt als <strong>{{ zugeordnet.name }}</strong>{% elif einst.personen %} – noch keiner Person zugeordnet:
+    bei der passenden Person unter „HA-Benutzer“ „{{ user }}“ eintragen{% endif %}.
+    Erkannt wird über HA-Benutzer, Name oder Vorname. Entfernte Personen verschwinden beim Speichern;
+    bereits erfasste Mahlzeiten und Snacks behalten ihren Namen.</p>
+
+  <h2>Snacks</h2>
+  <div class="card">
+    <div class="row"><label for="snack_limit_kinder">Snacks pro Tag und Katze, alle Kinder zusammen (Stück)</label>
+      <input type="text" inputmode="numeric" id="snack_limit_kinder" name="snack_limit_kinder"
+             value="{{ einst.snack_limit_kinder if einst.snack_limit_kinder is not none else '' }}" placeholder="kein Limit"></div>
+  </div>
+  <p class="note">Ist das Limit erreicht, wird ein weiterer Snack trotzdem gespeichert und deutlich markiert,
+    damit die Kalorienbilanz stimmt. Unabhängig davon gilt: Snacks höchstens 10 % des Tagesbedarfs.</p>
+  <h2>Schwellen für Hinweise</h2>
+  <div class="card">
+    {% for schluessel, name, einheit, standard, minimum, maximum, ganz in definitionen %}
+    {% set wert = form.get('s_' ~ schluessel, '') if form is not none else (abweichungen[schluessel] | de(0 if ganz else 2) if schluessel in abweichungen else '') %}
+    <div class="row"><label for="s_{{ schluessel }}">{{ name }}{% if einheit %} ({{ einheit }}){% endif %}</label>
+      <input type="text" inputmode="decimal" id="s_{{ schluessel }}" name="s_{{ schluessel }}" value="{{ wert }}"
+             placeholder="Standard {{ standard | de(0 if ganz else 2) }}"></div>
+    {% endfor %}
+  </div>
+  <p class="note">Leer = Standard. Nach 4–6 Wochen mit echten Daten prüfen und bei Bedarf anpassen.
+    Fest bleiben die Tierarzt-Hinweise (Blut, Apathie, mehrfaches Erbrechen, Durchfall über 48 h) und die 10-%-Grenze für Snacks.</p>
+  <button type="submit">Speichern</button>
+  </fieldset>
+</form>
+<script>
+  // Entfernen: Karte ausblenden und Namen leeren, gespeichert wird mit „Speichern“
+  document.querySelectorAll('.entfernen').forEach(knopf => knopf.addEventListener('click', () => {
+    const karte = knopf.closest('.person');
+    karte.querySelector('input[name=name]').value = '';
+    karte.hidden = true;
+    const hinweis = document.getElementById('entfernt-hinweis');
+    hinweis.hidden = false;
+    hinweis.textContent = '„' + knopf.dataset.name + '“ wird beim Speichern entfernt.';
+  }));
+  // Eine leere Zeile genügt; weitere bei Bedarf
+  const plus = document.getElementById('person-plus');
+  const vorlage = document.querySelector('.person.neu');
+  if (plus && vorlage) {
+    plus.hidden = false;
+    let nummer = document.querySelectorAll('.person').length;
+    plus.addEventListener('click', () => {
+      nummer += 1;
+      const neu = vorlage.cloneNode(true);
+      neu.querySelectorAll('[id]').forEach(el => el.id = el.id.replace(/\d+$/, '') + nummer);
+      neu.querySelectorAll('label[for]').forEach(el => el.htmlFor = el.htmlFor.replace(/\d+$/, '') + nummer);
+      neu.querySelectorAll('input').forEach(el => { el.value = ''; });
+      neu.querySelector('select').value = 'kind';
+      plus.before(neu);
+      neu.querySelector('input').focus();
+    });
+  }
+</script>
+{% endblock %}

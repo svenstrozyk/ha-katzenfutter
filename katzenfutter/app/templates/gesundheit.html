@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<p><a class="link" href="fuettern">‹ Füttern</a></p>
+<h1>Gesundheit</h1>
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if gespeichert %}<div class="meldung ok" role="status">Gespeichert.</div>{% endif %}
+{% if geloescht == '1' %}<div class="meldung ok" role="status">Eintrag gelöscht.</div>{% endif %}
+{% if geloescht == '0' %}<div class="meldung err" role="alert">Löschen nur bis 30 Minuten nach dem Eintrag.</div>{% endif %}
+
+{% for stufe, text in hinweise %}
+<div class="meldung {{ 'err' if stufe == 'tierarzt' else 'warn' }}" role="alert">
+  <strong>{{ 'Tierarzt' if stufe == 'tierarzt' else 'Hinweis' }}:</strong> {{ text }}</div>
+{% endfor %}
+{% if hinweise %}<p class="note" style="margin-top: -4px; margin-bottom: 12px;">Hinweise aus den Einträgen, keine Diagnose.</p>{% endif %}
+
+<form method="post" action="gesundheit" enctype="multipart/form-data">
+  <h2>Was ist passiert?</h2>
+  <div class="card" style="padding: 12px 16px;">
+    <div class="typen">
+      {% for wert, text in typen %}
+      <label class="typ"><input type="radio" name="typ" value="{{ wert }}" required
+        {% if form is not none and form.get('typ') == wert %}checked{% endif %}><span>{{ text }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <button type="submit">Speichern</button>
+
+  <h2>Optional</h2>
+  <div class="card">
+    <div class="row"><label for="uhrzeit">Uhrzeit (leer = jetzt)</label>
+      <input type="time" id="uhrzeit" name="uhrzeit" value="{{ form.get('uhrzeit', '') if form is not none else '' }}"
+             style="font: inherit; color: var(--text); background: transparent; border: 0; min-height: 44px;"></div>
+    <div class="row"><label for="person">Bemerkt von</label>
+      <select id="person" name="person">
+        {% for name in personen %}<option value="{{ name }}" {% if name == ((form.get('person') if form is not none else vorbelegt)) %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select></div>
+    <div class="row"><label for="blut">Blut gesehen</label>
+      <input type="checkbox" id="blut" name="blut" value="1" {% if form is not none and form.get('blut') %}checked{% endif %}></div>
+    <div class="row"><label for="apathie">Apathisch, matt</label>
+      <input type="checkbox" id="apathie" name="apathie" value="1" {% if form is not none and form.get('apathie') %}checked{% endif %}></div>
+    <div class="row"><label for="notiz">Notiz</label>
+      <input class="breit" type="text" id="notiz" name="notiz" value="{{ form.get('notiz', '') if form is not none else '' }}" placeholder="z. B. Gras, Futterreste"></div>
+    <div class="row"><label for="foto">Foto</label>
+      <input type="file" id="foto" name="foto" accept="image/*" style="max-width: 60%; font-size: 14px;"></div>
+  </div>
+  <button type="submit" class="button sekundaer">Mit Angaben speichern</button>
+</form>
+<p class="note">Wird automatisch der letzten Mahlzeit innerhalb von 12 Stunden zugeordnet (Haarballen nicht).</p>
+
+{% if ereignisse %}
+<h2>Letzte 30 Tage</h2>
+<div class="card">
+  {% for e in ereignisse %}
+  <div class="row"><span class="label"><strong>{{ typ_text[e.typ] }}</strong>
+    {%- if e.blut %} · <span style="color: var(--err);">Blut</span>{% endif %}
+    {%- if e.apathie %} · <span style="color: var(--err);">apathisch</span>{% endif %}<br>
+    <span class="muted" style="font-size: 14px;">{{ e.zeit | datum }} {{ e.zeit | uhrzeit }} · {{ e.person or 'unbekannt' }}
+      {%- if e.sorte %} · nach {{ e.sorte }} ({{ e.mahlzeit_zeit | uhrzeit }}){% endif %}
+      {%- if e.notiz %}<br>{{ e.notiz }}{% endif %}</span>
+    {%- if e.foto %}<br><a class="link" href="foto?datei={{ e.foto }}">Foto ansehen</a>{% endif %}</span>
+    {% if loeschbar(e) %}
+    <form method="post" action="ereignis_loeschen" style="margin: 0;">
+      <input type="hidden" name="ereignis_id" value="{{ e.id }}">
+      <button type="submit" class="chip" style="color: var(--err);">Löschen</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .typen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .typ { position: relative; }
+  .typ input { position: absolute; opacity: 0; inset: 0; }
+  .typ span { display: flex; align-items: center; justify-content: center; min-height: 56px; border-radius: 12px;
+              border: 1px solid var(--line); font-weight: 600; color: var(--accent); text-align: center; }
+  .typ input:checked + span { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .typ input:checked + span::before { content: "✓ "; }
+  .typ input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+{% endblock %}

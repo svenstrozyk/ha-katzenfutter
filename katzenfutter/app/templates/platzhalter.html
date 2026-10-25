@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>{{ titel }}</h1>
+<div class="meldung muted">Dieser Bereich folgt in {{ ('Schritt ' ~ schritt) if schritt is number else schritt }}.</div>
+{% endblock %}

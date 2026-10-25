@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% macro euro(wert, stellen=2) %}{{ wert | de(stellen) }} €{% endmacro %}
+{% block inhalt %}
+<p><a class="link" href="futter">‹ Futter</a></p>
+<h1>Kosten</h1>
+
+<nav class="zeitraum" aria-label="Zeitraum" style="display: flex; gap: 8px; margin-bottom: 4px;">
+  {% for t in auswahl %}<a class="chip" style="text-decoration: none; display: inline-flex; align-items: center;"
+     href="kosten?tage={{ t }}" {% if t == k.tage %}aria-pressed="true" aria-current="true"{% endif %}>{{ t }} Tage</a>{% endfor %}
+</nav>
+
+{% if k.ohne_preis %}
+<div class="meldung warn" role="status">Ohne Preis oder Packungsgröße, daher nicht mitgerechnet:
+  {% for p in k.ohne_preis %}<a class="link" href="produkt?id={{ p.id }}">{{ bezeichnung(p) }}</a>{{ ', ' if not loop.last }}{% endfor %}.</div>
+{% endif %}
+
+<h2>Letzte {{ k.tage }} Tage</h2>
+<div class="card">
+  {% if k.tage_mit_daten %}
+  <div class="row"><span class="label">Gesamt</span><span class="wert"><strong>{{ euro(k.gesamt) }}</strong></span></div>
+  <div class="row"><span class="label">Pro Tag (Ø über {{ k.tage_mit_daten }} {{ 'Tag' if k.tage_mit_daten == 1 else 'Tage' }})</span><span class="wert">{{ euro(k.je_tag) }}</span></div>
+  <div class="row"><span class="label">Hochgerechnet pro Monat</span><span class="wert">{{ euro(k.je_monat, 0) }}</span></div>
+  <div class="row"><span class="label">davon im Napf übrig geblieben</span><span class="wert">{{ euro(k.weggeworfen) }}</span></div>
+  {% else %}
+  <div class="row"><span class="label muted">Noch keine Mahlzeiten oder Snacks im Zeitraum.</span></div>
+  {% endif %}
+</div>
+{% if k.tage_mit_daten and k.tage_mit_daten < 14 %}<p class="note">Erst {{ k.tage_mit_daten }} Tage erfasst – die Hochrechnung ist noch grob.</p>{% endif %}
+
+{% if k.sorten %}
+<h2>Je Sorte</h2>
+<div class="card">
+  {% for e in k.sorten %}
+  <div class="row"><span class="label">{{ bezeichnung(e.produkt) }}{% if e.snack %} <span class="tag">Snack</span>{% endif %}<br>
+    <span class="muted" style="font-size: 14px;">{{ (e.menge_g / 1000) | de(2) }} kg</span></span>
+    <span class="wert">{{ euro(e.betrag) }}<br><span class="muted" style="font-size: 13px;">{{ (e.betrag / k.gesamt * 100) | de }} %</span></span></div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if k.monate | length > 1 %}
+<h2>Je Monat</h2>
+<div class="card">
+  {% for monat, betrag in k.monate | reverse %}
+  <div class="row"><span class="label">{{ monat[5:] }}.{{ monat[:4] }}</span><span class="wert">{{ euro(betrag) }}</span></div>
+  {% endfor %}
+</div>
+<p class="note">Angebrochene Monate am Rand des Zeitraums sind unvollständig.</p>
+{% endif %}
+
+{% if vergleich %}
+<h2>Preisvergleich aktive Sorten</h2>
+<div class="card">
+  <table class="vergleich">
+    <tr><th>Sorte</th><th>je 100 g</th><th>je 100 kcal</th></tr>
+    {% for e in vergleich %}
+    <tr><td>{{ e.produkt.sorte }}</td>
+      <td>{{ euro(e.je_100g) if e.je_100g is not none else '–' }}</td>
+      <td>{{ euro(e.je_100kcal) if e.je_100kcal is not none else '–' }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+<p class="note">„Je 100 kcal“ ist der faire Vergleich: energiereicheres Futter reicht länger. Preise je Packung im Futter pflegen.</p>
+{% endif %}
+{% endblock %}

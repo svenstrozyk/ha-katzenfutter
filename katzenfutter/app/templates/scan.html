@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<p><a class="link" href="{{ ziel }}">‹ {{ 'Füttern' if ziel == 'fuettern' else 'Futter' }}</a></p>
+<h1>Barcode</h1>
+{% if fehler %}<div class="meldung err" role="alert">{{ fehler }}</div>{% endif %}
+<div class="meldung" id="status" role="status" hidden></div>
+
+<div id="live" hidden>
+  <button type="button" id="kamera-start">Kamera starten</button>
+  <video id="video" playsinline muted hidden style="width: 100%; border-radius: 12px; background: #000;"></video>
+  <button type="button" id="kamera-stop" class="button sekundaer" hidden>Kamera beenden</button>
+</div>
+
+<label class="button" id="foto-knopf" for="foto">Barcode fotografieren</label>
+<input id="foto" type="file" accept="image/*" capture="environment" hidden>
+
+<h2>EAN eingeben</h2>
+<form method="get" action="scan">
+  <input type="hidden" name="ziel" value="{{ ziel }}">
+  <div class="card">
+    <div class="row"><label for="ean">EAN (Ziffern unter dem Strichcode)</label>
+      <input class="breit" type="text" inputmode="numeric" autocomplete="off" id="ean" name="ean" value="{{ ean }}" placeholder="13 Ziffern"></div>
+  </div>
+  <button type="submit" class="button sekundaer">Suchen</button>
+</form>
+<p class="note" id="hinweis-http" hidden>Live-Kamera nur über HTTPS (z. B. unterwegs über Nabu Casa). Im WLAN über http:// bitte das Foto verwenden.</p>
+<p class="note">Bekanntes Futter öffnet sich direkt, sonst wird ein neues Futter mit dieser EAN angelegt.</p>
+
+<script src="static/zxing/zxing-library-0.23.0.min.js"></script>
+<script>
+  // Relative Pfade (ohne führenden Schrägstrich), sonst bricht Ingress
+  const $ = id => document.getElementById(id);
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+  ]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+  function status(text, art) {
+    const el = $('status');
+    el.hidden = false; el.className = 'meldung' + (art ? ' ' + art : ''); el.textContent = text;
+  }
+
+  function gefunden(text) {
+    stopKamera();
+    status('Erkannt: ' + text, 'ok');
+    location.href = 'scan?ziel={{ ziel }}&ean=' + encodeURIComponent(text);
+  }
+
+  // --- Live-Kamera (nur Secure Context) ---
+  let leser = null;
+  function stopKamera() {
+    if (leser) { leser.reset(); leser = null; }
+    $('video').hidden = true; $('kamera-stop').hidden = true; $('kamera-start').hidden = false;
+  }
+  if (window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    $('live').hidden = false;
+  } else {
+    $('hinweis-http').hidden = false;
+  }
+  $('kamera-start').addEventListener('click', async () => {
+    leser = new ZXing.BrowserMultiFormatReader(hints, 250);
+    $('video').hidden = false; $('kamera-stop').hidden = false; $('kamera-start').hidden = true;
+    status('Barcode ins Bild halten …');
+    try {
+      await leser.decodeFromConstraints({ video: { facingMode: 'environment' } }, $('video'), (ergebnis) => {
+        if (ergebnis) gefunden(ergebnis.getText());
+      });
+    } catch (e) {
+      stopKamera();
+      status('Kamera nicht verfügbar (' + e.name + '). Bitte Foto oder EAN-Eingabe verwenden.', 'err');
+    }
+  });
+  $('kamera-stop').addEventListener('click', () => { stopKamera(); $('status').hidden = true; });
+
+  // --- Foto: im Browser dekodieren, mehrere Größen und hochkant (90°) versuchen ---
+  function leseCanvas(leser, bild, faktor, gedreht) {
+    const w = Math.round(bild.naturalWidth * faktor), h = Math.round(bild.naturalHeight * faktor);
+    const canvas = document.createElement('canvas');
+    canvas.width = gedreht ? h : w; canvas.height = gedreht ? w : h;
+    const g = canvas.getContext('2d');
+    if (gedreht) { g.translate(h, 0); g.rotate(Math.PI / 2); }
+    g.drawImage(bild, 0, 0, w, h);
+    try {
+      const quelle = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+      return leser.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(quelle))).getText();
+    } catch (e) {
+      if (!(e instanceof ZXing.NotFoundException)) console.warn(e);
+      return null;
+    }
+  }
+  function dekodiereBild(bild) {
+    const leser = new ZXing.MultiFormatReader();
+    leser.setHints(hints);
+    const laengste = Math.max(bild.naturalWidth, bild.naturalHeight);
+    for (const gedreht of [false, true]) {
+      for (const ziel of [1600, 1000, 2400]) {
+        const faktor = Math.min(1, ziel / laengste);
+        const text = leseCanvas(leser, bild, faktor, gedreht);
+        if (text) return text;
+        if (faktor === 1) break;
+      }
+    }
+    return null;
+  }
+  $('foto').addEventListener('change', (ereignis) => {
+    const datei = ereignis.target.files[0];
+    if (!datei) return;
+    status('Foto wird ausgewertet …');
+    const bild = new Image();
+    bild.onload = () => {
+      // kurz warten, damit die Statusmeldung gezeichnet wird
+      setTimeout(() => {
+        const text = dekodiereBild(bild);
+        URL.revokeObjectURL(bild.src);
+        ereignis.target.value = '';
+        if (text) gefunden(text);
+        else status('Kein Barcode erkannt. Näher heran, gerade halten, Spiegelungen vermeiden – oder EAN eingeben.', 'err');
+      }, 30);
+    };
+    bild.onerror = () => status('Foto konnte nicht gelesen werden.', 'err');
+    bild.src = URL.createObjectURL(datei);
+  });
+</script>
+{% endblock %}

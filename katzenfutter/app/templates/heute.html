@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>{{ katze.name }} heute</h1>
+
+{% if h.keine_aufnahme %}
+<div class="meldung err" role="alert"><strong>Tierarzt:</strong> Seit mehr als {{ h.keine_aufnahme_stunden }} Stunden keine Futteraufnahme erfasst.
+  Wenn sie wirklich nichts frisst, bitte Tierarzt kontaktieren.</div>
+{% endif %}
+{% for stufe, text in h.gesundheit %}
+<div class="meldung {{ 'err' if stufe == 'tierarzt' else 'warn' }}" role="alert">
+  <strong>{{ 'Tierarzt' if stufe == 'tierarzt' else 'Hinweis' }}:</strong> {{ text }}</div>
+{% endfor %}
+{% if h.akzeptanzeinbruch %}<div class="meldung warn" role="alert"><strong>Hinweis:</strong> {{ katze.name }} frisst seit
+  einigen Tagen über alle Futter deutlich weniger als üblich – eher Gesundheit oder Fremdfütterung als Vorliebe.</div>{% endif %}
+{% if h.viele_gaenge %}<div class="meldung warn" role="alert"><strong>Hinweis:</strong> {{ h.viele_gaenge }}</div>{% endif %}
+{% for text in h.gewicht_hinweise %}
+<div class="meldung warn" role="alert"><strong>Hinweis:</strong> {{ text }} <a class="link" href="verlauf">Verlauf</a></div>
+{% endfor %}
+{% if h.snack.warnung %}<div class="meldung warn" role="alert"><strong>Hinweis:</strong> Snacks haben 10 % des Tagesbedarfs erreicht.</div>{% endif %}
+{% if h.snack.limit_erreicht %}<div class="meldung warn" role="status"><strong>Hinweis:</strong> Snack-Limit der Kinder für heute erreicht
+  ({{ h.snack.kinder_stueck | gramm }} von {{ h.snack.limit }}).</div>{% endif %}
+{% if h.keine_aufnahme or h.gesundheit or h.gewicht_hinweise or h.akzeptanzeinbruch or h.viele_gaenge %}<p class="note" style="margin-top: -4px; margin-bottom: 12px;">Hinweise aus den Einträgen, keine Diagnose.</p>{% endif %}
+
+{% if h.offene_reste %}
+<a class="button" href="fuettern">Rest eintragen ({{ h.offene_reste }} offen)</a>
+{% endif %}
+
+<h2>Energie</h2>
+<div class="card">
+  {% if not h.mer %}
+  <div class="row"><span class="label">Tagesbedarf unbekannt – <a class="link" href="katze">Gewicht eintragen</a>.</span></div>
+  {% else %}
+  <div class="row" style="flex-direction: column; align-items: stretch; gap: 6px;">
+    <div class="balken" role="img" aria-label="{{ ((h.anteil or 0) * 100) | de }} % des Tagesbedarfs gefressen, {{ ((h.anteil_offen or 0) * 100) | de }} % angeboten mit offenem Rest">
+      <span class="gefressen" style="width: {{ [h.anteil * 100, 100] | min }}%;"></span>
+      <span class="offen" style="width: {{ [h.anteil_offen * 100, [100 - h.anteil * 100, 0] | max] | min }}%;"></span>
+    </div>
+    <div class="muted" style="font-size: 14px;">{{ (h.anteil * 100) | de }} % von {{ h.mer | de }} kcal
+      {%- if h.anteil_offen %} · gestreift: angeboten, Rest offen{% endif %}</div>
+  </div>
+  <div class="row"><span class="label">Gefressen{% if h.geschaetzt %} <span class="muted" style="font-size: 13px;">(teils geschätzt)</span>{% endif %}</span>
+    <span class="wert {{ 'geschaetzt' if h.geschaetzt }}">{{ '≈ ' if h.geschaetzt }}{{ h.gefressen_kcal | de }} kcal</span></div>
+  <div class="row"><span class="label">Snacks</span><span class="wert">{{ h.snack_kcal | de }} kcal</span></div>
+  {% if h.offen_kcal %}<div class="row"><span class="label">Angeboten, Rest offen</span><span class="wert">bis {{ h.offen_kcal | de }} kcal</span></div>{% endif %}
+  <div class="row"><span class="label"><strong>Verbleibend</strong></span><span class="wert"><strong>{{ h.rest_kcal | de }} kcal</strong></span></div>
+  {% if h.vorschlag %}
+  <div class="row"><span class="label">entspricht {{ h.vorschlag.produkt.sorte }}</span>
+    <span class="wert">{{ h.vorschlag.menge_g | de }} g{% if h.vorschlag.packungen is not none %}<br><span class="muted" style="font-size: 13px;">{{ h.vorschlag.packungen | de(1) }} Packungen</span>{% endif %}</span></div>
+  {% endif %}
+  {% if h.kcal_unbekannt %}<div class="row"><span class="label muted" style="font-size: 14px;">Bei einem Futter oder Snack fehlen kcal – Werte unvollständig.</span></div>{% endif %}
+  {% endif %}
+</div>
+
+<h2>Futter</h2>
+<div class="card">
+  <div class="row"><span class="label">Mahlzeiten</span><span class="wert">{{ h.mahlzeiten }}</span></div>
+  <div class="row"><span class="label">Angeboten</span><span class="wert">{{ h.angeboten_g | gramm }} g</span></div>
+  <div class="row"><span class="label">Gefressen</span><span class="wert {{ 'geschaetzt' if h.geschaetzt }}">{{ '≈ ' if h.geschaetzt }}{{ h.gefressen_g | gramm }} g</span></div>
+</div>
+
+{% if h.petkit %}
+<h2>Katzenklo</h2>
+<div class="card">
+  <div class="row"><span class="label">Toilettengänge (24 Stunden)</span><span class="wert">{{ h.toilettengaenge }}</span></div>
+</div>
+<p class="note">Freigängerin: Gänge draußen sind nicht erfasst, wenige im Klo sind normal.</p>
+{% endif %}
+
+{% if h.wasser %}
+<h2>Wasser</h2>
+<div class="card">
+  <div class="row"><span class="label">Aus dem Futter</span><span class="wert {{ 'geschaetzt' if h.geschaetzt }}">{{ '≈ ' if h.geschaetzt }}{{ h.wasser.gesamt_ml | de }} ml</span></div>
+  <div class="row"><span class="label">Getrunken</span><span class="wert muted">unbekannt</span></div>
+  <div class="row"><span class="label">Richtwert gesamt</span><span class="wert">{{ h.wasser.richtwert_min_ml | de }}–{{ h.wasser.richtwert_max_ml | de }} ml</span></div>
+</div>
+<p class="note">Getrunkenes kommt mit dem PetKit-Trinkbrunnen dazu.{% if h.wasser_feuchte_fehlt %} Bei einem Futter fehlt die Feuchte.{% endif %}</p>
+{% endif %}
+
+{% if h.ereignisse_heute %}
+<h2>Gesundheit heute</h2>
+<div class="card">
+  {% for e in h.ereignisse_heute %}
+  <div class="row"><span class="label">{{ e.zeit | uhrzeit }} · {{ typ_text[e.typ] }}{% if e.sorte %} · nach {{ e.sorte }}{% endif %}</span></div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2>Erfassen</h2>
+<a class="button" href="fuettern">Füttern</a>
+<a class="button sekundaer" href="snack">Snack geben</a>
+<a class="button sekundaer" href="gesundheit">Erbrechen, Durchfall … melden</a>
+
+<p class="note">
+  {% if h.letzte_wiegung %}Letzte Wiegung: {{ h.letzte_wiegung.kg | de(2) }} kg am {{ h.letzte_wiegung.zeit | datum }}{% endif %}
+  {% if katze.freigang %}Freigängerin: Beute und Fremdfutter sind nicht erfasst – maßgeblich ist der Gewichtstrend.{% endif %}
+</p>
+
+<style>
+  .balken { display: flex; height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
+  .balken .gefressen { background: var(--accent); }
+  .balken .offen { background: repeating-linear-gradient(45deg, var(--accent) 0 4px, transparent 4px 8px); opacity: 0.6; }
+  .geschaetzt { font-style: italic; }
+</style>
+{% endblock %}

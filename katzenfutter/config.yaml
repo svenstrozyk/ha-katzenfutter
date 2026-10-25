@@ -1,0 +1,46 @@
+name: Katzenfutter
+version: "0.24.0"
+slug: katzenfutter
+url: https://github.com/svenstrozyk/ha-katzenfutter
+# Vorgebaute Images (GitHub Actions, Workflow „Images“); HA lädt sie statt auf dem Pi zu bauen
+image: "ghcr.io/svenstrozyk/{arch}-addon-katzenfutter"
+description: Futter- und Ernährungstracking für die Katze
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:cat
+panel_title: Katzenfutter
+# Panel auch für Nicht-Admin-Benutzer sichtbar
+panel_admin: false
+# Zugriff auf die HA-Core-API über den Supervisor (Token wird automatisch gesetzt)
+homeassistant_api: true
+# Sensoren per MQTT-Discovery am Mosquitto-Broker; Zugangsdaten liefert der Supervisor
+services:
+  - mqtt:need
+# Konfigurationsordner (/config) für die Tageskopien der Datenbank, per Samba/SSH erreichbar
+map:
+  - addon_config:rw
+options:
+  notify_services: []
+  rest_erinnerung_minuten: 30
+  online_produktdaten: true
+  warn_mitteilungen: true
+schema:
+  # Empfänger der Mitteilungen (ohne „notify.“); leer = alle Handys mit Home-Assistant-App
+  notify_services:
+    - "str?"
+  # Minuten nach dem Füttern bis zur Rest-Erinnerung; 0 = aus
+  rest_erinnerung_minuten: int(0,720)
+  # Produktdaten per EAN aus Open Pet Food Facts holen (übertragen wird nur die EAN)
+  online_produktdaten: bool
+  # Mitteilung bei Tierarzt-Hinweis, keiner Futteraufnahme, Gewichts-/Akzeptanzhinweis, Snack-Limit
+  warn_mitteilungen: bool
+  # nur falls die automatische Erkennung des Brokers nicht funktioniert
+  mqtt_host: str?
+  mqtt_port: port?
+  mqtt_user: str?
+  mqtt_password: password?

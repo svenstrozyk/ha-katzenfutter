@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<p><a class="link" href="fuettern">‹ Füttern</a></p>
+<h1>Snack</h1>
+{% if fehler %}<div class="meldung err" role="alert">Nicht gespeichert: {{ fehler }}</div>{% endif %}
+{% if gespeichert %}
+<div class="meldung ok" role="status">Snack gespeichert: {{ gespeichert.stueck | gramm }} × {{ gespeichert.sorte }}
+  ({{ gespeichert.person }}{% if gespeichert.kcal is not none %}, {{ gespeichert.kcal | de }} kcal{% endif %}).
+  <form method="post" action="snack_rueckgaengig" style="margin: 0;">
+    <input type="hidden" name="snack_id" value="{{ gespeichert.id }}">
+    <button type="submit" class="button sekundaer" style="margin-bottom: 0;">Rückgängig</button>
+  </form>
+</div>
+{% endif %}
+{% if zurueckgenommen == '1' %}<div class="meldung ok" role="status">Snack zurückgenommen.</div>{% endif %}
+{% if zurueckgenommen == '0' %}<div class="meldung err" role="alert">Zurücknehmen nur bis 30 Minuten nach dem Eintrag.</div>{% endif %}
+
+<h2>Heute</h2>
+<div class="card">
+  <div class="row"><span class="label">Snacks</span>
+    <span class="wert">{{ stand.kcal | de }} kcal{% if stand.max_kcal %} von höchstens {{ stand.max_kcal | de }}{% endif %}</span></div>
+  {% if stand.warnung %}<div class="row"><span class="label" style="color: var(--warn);">⚠ 10 % des Tagesbedarfs erreicht –
+    heute keine weiteren Snacks.</span></div>{% endif %}
+  {% if stand.kcal_unbekannt %}<div class="row"><span class="label muted">Bei mindestens einem Snack fehlen kcal
+    (kcal/100 g oder Stückgewicht im Tab Futter ergänzen).</span></div>{% endif %}
+  {% if stand.limit is not none %}
+  <div class="row"><span class="label">Kinder</span>
+    <span class="wert" {% if stand.limit_erreicht %}style="color: var(--warn);"{% endif %}>
+      {{ stand.kinder_stueck | gramm }} von {{ stand.limit }} Stück{% if stand.limit_erreicht %} · ⚠ Limit erreicht{% endif %}</span></div>
+  {% endif %}
+  {% if not stand.max_kcal %}<div class="row"><span class="label muted">Tagesbedarf unbekannt – Gewicht im Tab Katze eintragen.</span></div>{% endif %}
+</div>
+
+{% if not auswahl %}
+<div class="meldung muted">Noch kein Snack angelegt. Im Tab <a class="link" href="futter">Futter</a> ein Futter mit
+  Futterart „Snack“ anlegen (mit kcal/100 g und Stückgewicht).</div>
+{% else %}
+<form method="post" action="snack">
+  <h2>Snack</h2>
+  <div class="card">
+    {% set gewaehlt = (form.get('produkt_id') | int) if form is not none else auswahl[0].id %}
+    {% for p in auswahl %}
+    <label class="row" style="cursor: pointer;">
+      <span class="label">{{ p.marke }} {{ p.sorte }}<br><span class="muted" style="font-size: 14px;">
+        {% if p.stueck_g and p.kcal_100g is not none %}{{ (p.stueck_g * p.kcal_100g / 100) | de(1) }} kcal je Stück
+        {% else %}kcal je Stück unbekannt{% endif %}</span></span>
+      <input type="radio" name="produkt_id" value="{{ p.id }}" style="width: 24px; height: 24px; accent-color: var(--accent);"
+             {% if p.id == gewaehlt %}checked{% endif %}>
+    </label>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <div class="row"><label for="stueck">Anzahl (Stück)</label>
+      <input type="text" inputmode="decimal" id="stueck" name="stueck" value="{{ form.get('stueck', '1') if form is not none else '1' }}"></div>
+    <div class="row"><label for="menge_g">Menge (g, falls nicht stückweise)</label>
+      <input type="text" inputmode="decimal" id="menge_g" name="menge_g" placeholder="optional"
+             value="{{ form.get('menge_g', '') if form is not none else '' }}"></div>
+    <div class="row"><label for="person">Gegeben von</label>
+      <select id="person" name="person">
+        {% for name in personen %}<option value="{{ name }}" {% if name == ((form.get('person') if form is not none else vorbelegt)) %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select></div>
+  </div>
+  {% if stand.limit_erreicht %}<p class="note" style="color: var(--warn);">Das Snack-Limit der Kinder ist für heute erreicht.
+    Ein weiterer Snack wird trotzdem gespeichert und markiert.</p>{% endif %}
+  <button type="submit">Snack geben</button>
+</form>
+{% endif %}
+
+{% if stand.liste %}
+<h2>Heute gegeben</h2>
+<div class="card">
+  {% for x in stand.liste %}
+  <div class="row"><span class="label">{{ x.zeit | uhrzeit }} · {{ x.sorte }}<br>
+    <span class="muted" style="font-size: 14px;">{{ x.person }}{% if ist_kind(x.person) %} (Kind){% endif %}
+      {%- if x.erfasst_von and x.erfasst_von != x.person %} · eingetragen von {{ x.erfasst_von }}{% endif %}</span></span>
+    <span class="wert">{{ x.stueck | gramm }} St.{% if x.kcal is not none %}<br><span class="muted" style="font-size: 13px;">{{ x.kcal | de }} kcal</span>{% endif %}</span></div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

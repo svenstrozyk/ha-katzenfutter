@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>Futter</h1>
+{% if gespeichert %}<div class="meldung ok" role="status">Gespeichert.{% if neu_berechnet %} kcal von {{ neu_berechnet }}
+  {{ 'Eintrag' if neu_berechnet == 1 else 'Einträgen' }} (Mahlzeiten, Snacks) mit den neuen Werten neu berechnet.{% endif %}</div>{% endif %}
+{% if gesperrt %}<div class="meldung ok" role="status">Sorte gesperrt. Entsperren: Futter öffnen, Status auf „aktiv“.</div>{% endif %}
+{% if einbruch %}<div class="meldung warn" role="alert"><strong>Hinweis:</strong> Die Akzeptanz sinkt über alle Futter.
+  Das spricht eher für Gesundheit oder Fremdfütterung als für eine Vorliebe – {{ katze.name }} beobachten.</div>{% endif %}
+
+{% if darf_aendern %}
+<a class="button" href="scan">Barcode scannen</a>
+<a class="button sekundaer" href="produkt">Futter ohne Barcode anlegen</a>
+{% endif %}
+<a class="button sekundaer" href="kosten">Kosten</a>
+
+{% if not liste %}
+<div class="meldung muted">Noch kein Futter angelegt.</div>
+{% else %}
+<h2>Sorten</h2>
+<div class="card">
+  {% for p, tm in liste %}
+  <a class="row zeile" href="produkt?id={{ p.id }}">
+    <span class="label">{{ bezeichnung(p) }}
+      {% if p.status != 'aktiv' %}<span class="tag">{{ p.status }}</span>{% endif %}
+      {% set v = vorlieben.get(('produkt', p.id | string)) %}
+      {% if v and v.status == 'liebling' %}<span class="tag tag-liebling">♥ Liebling</span>{% endif %}
+      {% if v and v.status == 'abgelehnt' %}<span class="tag tag-abgelehnt">✕ wird nicht gemocht</span>{% endif %}
+      {% if p.futterart != 'allein' %}<span class="tag">{{ 'Snack' if p.futterart == 'snack' else 'Ergänzung' }}</span>{% endif %}
+      <br><span class="muted" style="font-size: 14px;">
+        {% if p.kcal_100g is not none %}{{ p.kcal_100g | de }} kcal/100 g{% if p.kcal_herkunft == 'berechnet' %} (berechnet){% endif %}
+        {% else %}kcal fehlen{% endif %}
+        {%- if p.futterart != 'snack' %} · Bestand {{ p.packungen or 0 }}{% if p.angebrochen_g %} + {{ p.angebrochen_g | gramm }} g angebrochen{% endif %}{% endif %}
+      </span></span>
+    <span class="chevron">›</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% if attribute %}
+<h2>Vorlieben</h2>
+<div class="card">
+  {% for bezug, schluessel, e in attribute %}
+  <div class="row"><span class="label">{{ bezug_text[bezug] }}: {{ (schluessel[:1] | upper ~ schluessel[1:]) if bezug != 'marke' else schluessel }}<br>
+    <span class="muted" style="font-size: 14px;">{{ e.n }} Mahlzeiten · Ø {{ (e.akzeptanz * 100) | de }} % gefressen</span></span>
+    <span class="wert">{{ status_text[e.status] }}{% if e.score is not none %}<br><span class="muted" style="font-size: 13px;">Score {{ '%+.2f' | format(e.score) | replace('.', ',') }}</span>{% endif %}</span></div>
+  {% endfor %}
+</div>
+<p class="note">Score: wie viel mehr oder weniger als üblich gefressen wird (über alle Futter, 14 Tage), gewichtet
+  nach gewogen/geschätzt. Lieblingsfutter ab +{{ s.liebling_score | de(2) }} bei {{ s.liebling_n }} Mahlzeiten,
+  „wird nicht gemocht“ ab −{{ s.abgelehnt_score | de(2) }} bei {{ s.abgelehnt_n }} Mahlzeiten oder {{ s.abgelehnt_verweigert }}× verweigert.
+  Schwellen in den <a class="link" href="einstellungen">Einstellungen</a>.</p>
+{% endif %}
+
+<h2>Vergleich auf Trockenmasse</h2>
+<div class="card">
+  <table class="vergleich">
+    <tr><th>Sorte</th><th>Protein</th><th>Fett</th><th>NfE</th><th>kcal/100 g TM</th></tr>
+    {% for p, tm in liste if p.status == 'aktiv' %}
+    <tr>
+      <td>{{ p.sorte }}</td>
+      {% if tm %}
+        <td>{{ tm.rohprotein | de(0) if tm.rohprotein is defined else '–' }} %</td>
+        <td>{{ tm.rohfett | de(0) if tm.rohfett is defined else '–' }} %</td>
+        <td>{{ tm.nfe | de(0) if tm.nfe is defined else '–' }} %</td>
+        <td>{{ tm.kcal_100g | de(0) if tm.kcal_100g is defined else '–' }}</td>
+      {% else %}
+        <td colspan="4" class="muted">Feuchte fehlt</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+<p class="note">Trockenmasse = Werte ohne Wasseranteil; nur so sind Futter mit unterschiedlicher Feuchte vergleichbar.
+  „berechnet“: kcal aus der Deklaration nach Atwater, nicht vom Hersteller angegeben.</p>
+{% endif %}
+{% endblock %}
