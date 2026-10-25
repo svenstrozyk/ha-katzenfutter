@@ -17,6 +17,7 @@ DEFINITIONEN = [
     ("abgelehnt_score", "„Wird nicht gemocht“ ab Score −", "", 0.20, 0.02, 0.8, False),
     ("abgelehnt_n", "„Wird nicht gemocht“ ab Mahlzeiten", "", 3, 2, 30, True),
     ("abgelehnt_verweigert", "„Wird nicht gemocht“ ab Verweigerungen", "", 2, 1, 10, True),
+    ("nachkaufen_tage", "Nachkaufen, wenn der Bestand reicht unter", "Tage", 7, 1, 60, True),
 ]
 STANDARD = {d[0]: d[3] for d in DEFINITIONEN}
 

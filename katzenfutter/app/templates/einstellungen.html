@@ -43,6 +43,27 @@
   </div>
   <p class="note">Ist das Limit erreicht, wird ein weiterer Snack trotzdem gespeichert und deutlich markiert,
     damit die Kalorienbilanz stimmt. Unabhängig davon gilt: Snacks höchstens 10 % des Tagesbedarfs.</p>
+  <h2>Einkaufsliste</h2>
+  {% set ek_wert = form.get('einkauf_liste', '') if form is not none else einkauf.liste %}
+  {% set ids = todo_listen | map('first') | list %}
+  {% if not ek_wert %}{% set ek_wert = 'todo.shopping_list' if 'todo.shopping_list' in ids else ('todo.einkaufsliste' if 'todo.einkaufsliste' in ids else '') %}{% endif %}
+  <div class="card">
+    <div class="row"><label for="einkauf_liste">Liste in Home Assistant</label>
+      {% if todo_listen %}
+      <select id="einkauf_liste" name="einkauf_liste">
+        <option value="" {% if not ek_wert %}selected{% endif %}>keine</option>
+        {% for eid, name in todo_listen %}<option value="{{ eid }}" {% if eid == ek_wert %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+      {% else %}
+      <input class="breit" type="text" id="einkauf_liste" name="einkauf_liste" value="{{ ek_wert }}" placeholder="todo.einkaufsliste">
+      {% endif %}</div>
+    <div class="row"><label for="einkauf_automatisch">Knappe Sorten automatisch eintragen</label>
+      <input type="checkbox" id="einkauf_automatisch" name="einkauf_automatisch" value="1"
+             {% if ((form.get('einkauf_automatisch') == '1') if form is not none else einkauf.automatisch) %}checked{% endif %}></div>
+  </div>
+  <p class="note">Unter Futter → Bestand lassen sich Sorten von Hand auf die Liste setzen. Automatisch wird jede Sorte
+    einmal eingetragen, sobald sie knapp wird, und erst wieder, nachdem sie zwischendurch aufgefüllt war.
+    Steht sie schon offen auf der Liste, entsteht kein zweiter Eintrag.</p>
   <h2>Schwellen für Hinweise</h2>
   <div class="card">
     {% for schluessel, name, einheit, standard, minimum, maximum, ganz in definitionen %}

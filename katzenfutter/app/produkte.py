@@ -92,6 +92,7 @@ def aus_formular(form):
         kcal = zahl(form.get("kcal_100g"))
         packungen = zahl(form.get("bestand_packungen"))
         angebrochen = zahl(form.get("bestand_angebrochen_g"))
+        mindest = zahl(form.get("mindestbestand"))
     except ValueError:
         return None, None, "Bitte Zahlen eingeben, z. B. 10,5."
 
@@ -115,6 +116,9 @@ def aus_formular(form):
         return None, None, "Angebrochene Menge darf nicht negativ sein."
     if angebrochen and daten["packung_g"] and angebrochen > daten["packung_g"]:
         return None, None, "Angebrochene Menge ist größer als eine Packung."
+    if mindest is not None and (mindest < 0 or mindest != int(mindest) or mindest > 500):
+        return None, None, "Mindestbestand bitte als ganze Zahl von Packungen angeben (leer = nach Reichweite)."
+    daten["mindestbestand"] = int(mindest) if mindest is not None else None
     bestand = {"packungen": int(packungen or 0), "angebrochen_g": angebrochen}
     return daten, bestand, None
 

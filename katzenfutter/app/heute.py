@@ -1,6 +1,7 @@
 """Tagesbilanz für die Heute-Ansicht (Tagesgrenze Europe/Berlin)."""
 import datetime
 
+import bestand
 import fachlogik
 import gesundheit
 import mahlzeiten
@@ -81,6 +82,7 @@ def zusammenfassung(con, katze, einst, mer_kcal):
         "toilettengaenge": petkit.toilettengaenge(con, katze_id, 1),
         "viele_gaenge": petkit.viele_gaenge(con, katze_id),
         "ereignisse_heute": [e for e in gesundheit.liste(con, katze_id, tage=1) if e["zeit"] >= zeit.tagesbeginn_utc()],
+        "nachkaufen": [z for z in bestand.uebersicht(con, s["nachkaufen_tage"]) if z["knapp"]],
         "letzte_wiegung": con.execute(
             "SELECT zeit, kg FROM gewicht WHERE katze_id = ? AND verworfen = 0 ORDER BY zeit DESC LIMIT 1", (katze_id,)
         ).fetchone(),

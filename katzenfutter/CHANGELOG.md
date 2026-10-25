@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.0 – 2026-10-25
+
+- Neue Seite **Bestand & Einkauf** (Tab Futter): Bestand und Reichweite je Sorte aus dem Verbrauch der letzten
+  14 Tage, „bald nachkaufen“, Lieferung für mehrere Sorten auf einmal (+/− je Sorte, negative Zahl korrigiert)
+- Knapp: Reichweite unter 7 Tagen (Schwelle einstellbar) oder fester Mindestbestand je Sorte
+  („Nachkaufen ab“ im Futter)
+- Einkaufsliste: knappe Sorten mit einem Tipp in eine To-do-Liste von Home Assistant, optional automatisch
+  (einmal je Knapp-Phase, keine doppelten offenen Einträge). Liste in den Einstellungen wählen
+- Heute: Hinweis „Bald nachkaufen“
+- Lieferung eintragen nur Erwachsene, auf die Einkaufsliste setzen alle
+
 ## 0.25.0 – 2026-10-25
 
 - Füttern: Menge steht standardmäßig auf einer ganzen Packung (auch wenn eine Packung angebrochen ist;

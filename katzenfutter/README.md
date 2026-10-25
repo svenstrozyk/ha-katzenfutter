@@ -3,7 +3,7 @@
 Futter- und Ernährungstracking für die Katze, als Panel in der Home-Assistant-Seitenleiste.
 Alle Haushaltsmitglieder mit HA-Benutzer können es nutzen (auch ohne Admin-Rechte).
 
-## Funktionen (Stand 0.22.0)
+## Funktionen (Stand 0.26.0)
 
 - **Heute:** Energie-Bilanz des Tages, verbleibende Menge, Wasser aus Futter, alle Hinweise
 - **Verlauf:** Gewicht mit 7-Tage-Trend und Hinweisen, kcal je Tag, Tabelle; Gewicht eintragen
@@ -14,6 +14,8 @@ Alle Haushaltsmitglieder mit HA-Benutzer können es nutzen (auch ohne Admin-Rech
   Daten per EAN aus Open Pet Food Facts, Deklaration per Live Text einfügen (Werte werden nur vorbelegt)
 - **Vorlieben:** Lieblingsfutter und „wird nicht gemocht“ je Sorte, Marke, Textur, Hauptprotein
 - **Kosten:** je Tag, Monat und Sorte, Preisvergleich je 100 kcal
+- **Bestand & Einkauf:** Reichweite je Sorte, „bald nachkaufen“, Lieferung für mehrere Sorten auf einmal,
+  knappe Sorten auf die Einkaufsliste (HA-To-do-Liste, von Hand oder automatisch)
 - **Füttern:** Sorte und Menge in wenigen Tipps, Bestand wird fortgeschrieben, Rückgängig bis 30 Minuten
 - **Rest:** geschätzt mit einem Tipp oder gewogen, „verweigert“; geschätzte Werte sind gekennzeichnet
 - **Snacks:** Stück oder Gramm, Obergrenze 10 % des Tagesbedarfs, Tageslimit der Kinder

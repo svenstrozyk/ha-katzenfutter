@@ -19,6 +19,8 @@
 {% if h.snack.warnung %}<div class="meldung warn" role="alert"><strong>Hinweis:</strong> Snacks haben 10 % des Tagesbedarfs erreicht.</div>{% endif %}
 {% if h.snack.limit_erreicht %}<div class="meldung warn" role="status"><strong>Hinweis:</strong> Snack-Limit der Kinder für heute erreicht
   ({{ h.snack.kinder_stueck | gramm }} von {{ h.snack.limit }}).</div>{% endif %}
+{% if h.nachkaufen %}<a class="meldung zeile" href="bestand" style="display: block; text-decoration: none; color: var(--text);">
+  <strong>Bald nachkaufen:</strong> {{ h.nachkaufen | map(attribute='bezeichnung') | join(', ') }} <span class="link">Bestand ›</span></a>{% endif %}
 {% if h.keine_aufnahme or h.gesundheit or h.gewicht_hinweise or h.akzeptanzeinbruch or h.viele_gaenge %}<p class="note" style="margin-top: -4px; margin-bottom: 12px;">Hinweise aus den Einträgen, keine Diagnose.</p>{% endif %}
 
 {% if h.offene_reste %}

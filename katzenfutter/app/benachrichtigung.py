@@ -11,9 +11,12 @@ import time
 
 import requests
 
+import bestand
 import datenbank
+import einkauf
 import fachlogik
 import mahlzeiten
+import schwellen
 import warnungen
 import zeit
 
@@ -176,6 +179,21 @@ class Dienst:
         finally:
             con.close()
 
+    def einkaufen_einmal(self):
+        """Neu knapp gewordene Sorten auf die Einkaufsliste setzen, falls eingeschaltet."""
+        con = datenbank.verbinden(self.db_pfad)
+        try:
+            zeilen = bestand.uebersicht(con, schwellen.laden(con)["nachkaufen_tage"])
+            anzahl = einkauf.automatisch(con, self.token, zeilen)
+            if anzahl:
+                log.info("%s Sorte(n) auf die Einkaufsliste gesetzt", anzahl)
+            return anzahl
+        except einkauf.Fehler as exc:
+            log.warning("Einkaufsliste: %s", exc)
+            return 0
+        finally:
+            con.close()
+
     def warnen_einmal(self):
         """Neue Warnungen (Tierarzt, keine Futteraufnahme, Gewicht, Akzeptanz, Snack-Limit) senden."""
         optionen = self.optionen_lesen()
@@ -207,6 +225,7 @@ class Dienst:
             try:
                 self.erinnern_einmal()
                 self.warnen_einmal()
+                self.einkaufen_einmal()
             except requests.RequestException as exc:
                 # z. B. während eines Neustarts von Home Assistant
                 log.warning("Rest-Erinnerung nicht gesendet (%s), neuer Versuch in 1 Minute", exc)

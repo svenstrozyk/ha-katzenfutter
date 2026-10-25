@@ -1,6 +1,6 @@
 # Anleitung
 
-Einrichtung, Alltag und Pflege des Katzenfutter-Add-ons. Stand: Version 0.24.0.
+Einrichtung, Alltag und Pflege des Katzenfutter-Add-ons. Stand: Version 0.26.0.
 
 ---
 
@@ -51,6 +51,8 @@ Voraussetzungen: Mosquitto-Broker (Add-on) für die Sensoren, HA-App auf den Han
 | Gewicht | Tab **Verlauf** | etwa wöchentlich, gleiche Tageszeit |
 | Überblick | Tab **Heute** | Energie-Bilanz, verbleibende Menge, alle Hinweise |
 | Kosten | Futter → **Kosten** | Preis je Packung bei jeder Sorte pflegen |
+| Einkauf angekommen | Futter → **Bestand & Einkauf** | je Sorte +/− tippen, **Lieferung speichern** |
+| Nachkaufen | Futter → **Bestand & Einkauf** oder Hinweis auf **Heute** | **Auf Einkaufsliste**; Liste in den Einstellungen wählen, optional automatisch |
 
 Die Rest-Erinnerung kommt 30 Minuten nach einer Mahlzeit ohne Rest auf alle Empfänger; lang drücken zeigt die Knöpfe.
 

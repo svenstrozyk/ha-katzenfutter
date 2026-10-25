@@ -1,5 +1,5 @@
 name: Katzenfutter
-version: "0.25.0"
+version: "0.26.0"
 slug: katzenfutter
 url: https://github.com/svenstrozyk/ha-katzenfutter
 # Vorgebaute Images (GitHub Actions, Workflow „Images“); HA lädt sie statt auf dem Pi zu bauen

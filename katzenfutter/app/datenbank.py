@@ -214,6 +214,13 @@ MIGRATIONEN = [
             "CREATE INDEX gewicht_quelle_zeit ON gewicht (katze_id, quelle, zeit)",
         ],
     ),
+    (
+        12,
+        "Mindestbestand je Sorte (Packungen; leer = nach Reichweite)",
+        [
+            "ALTER TABLE produkt ADD COLUMN mindestbestand INTEGER CHECK (mindestbestand IS NULL OR mindestbestand >= 0)",
+        ],
+    ),
 ]
 
 

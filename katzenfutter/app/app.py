@@ -16,8 +16,10 @@ import requests
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 import benachrichtigung
+import bestand as bestand_modul
 import datenbank
 import ean_daten
+import einkauf
 import einstellungen
 import fachlogik
 import gesundheit
@@ -602,6 +604,16 @@ def snack_rueckgaengig():
     return redirect(url_for("snack", zurueckgenommen=1 if ok else 0))
 
 
+def todo_listen():
+    """To-do-Listen aus Home Assistant für die Auswahl; leer ohne Verbindung (Eingabefeld bleibt)."""
+    if not SUPERVISOR_TOKEN:
+        return []
+    try:
+        return einkauf.listen(SUPERVISOR_TOKEN)
+    except (requests.RequestException, ValueError, KeyError):
+        return []
+
+
 @app.route("/einstellungen", methods=["GET", "POST"])
 def einstellungen_seite():
     con = db()
@@ -616,12 +628,16 @@ def einstellungen_seite():
             abweichungen = None
             if not fehler:
                 abweichungen, fehler = schwellen.aus_formular(request.form)
+            ek_liste = ek_auto = None
+            if not fehler:
+                ek_liste, ek_auto, fehler = einkauf.aus_formular(request.form)
             if not fehler and personen and not einstellungen.darf_aendern(
                     {"personen": personen, "snack_limit_kinder": limit}, ha_benutzer()):
                 fehler = "Du würdest dich selbst aussperren: Trage deinen HA-Benutzer bei einer erwachsenen Person ein."
             if not fehler:
                 einstellungen.speichern(con, personen, limit)
                 schwellen.speichern(con, abweichungen)
+                einkauf.speichern(con, liste=ek_liste, automatisch=ek_auto)
                 return redirect(url_for("einstellungen_seite", gespeichert=1))
         return render_template(
             "einstellungen.html", tab="katze", titel="Einstellungen", einst=einst, darf=darf,
@@ -629,6 +645,7 @@ def einstellungen_seite():
             benutzername=request.headers.get("X-Remote-User-Name") or "",
             zugeordnet=einstellungen.person_zu_benutzer(einst, ha_benutzer()),
             definitionen=schwellen.DEFINITIONEN, abweichungen=schwellen.abweichungen(con),
+            einkauf=einkauf.laden(con), todo_listen=todo_listen(),
             form=request.form if fehler else None,
             gespeichert=request.args.get("gespeichert") and not fehler,
         ), (400 if fehler else 200)
@@ -739,6 +756,7 @@ def futter():
         liste = [(p, produkte.trockenmasse(p)) for p in produkte.liste(con)]
         vorlieben, einbruch = praeferenz.aktualisieren(con, tier["id"])
         s_werte = schwellen.laden(con)
+        knapp_anzahl = sum(z["knapp"] for z in bestand_modul.uebersicht(con, s_werte["nachkaufen_tage"]))
     finally:
         con.close()
     attribute = sorted(((bezug, s, e) for (bezug, s), e in vorlieben.items() if bezug != "produkt"),
@@ -749,6 +767,7 @@ def futter():
         vorlieben=vorlieben, attribute=attribute, einbruch=einbruch, s=s_werte,
         status_text=praeferenz.STATUS_TEXT, bezug_text=praeferenz.BEZUG_TEXT,
         gesperrt=request.args.get("gesperrt"), neu_berechnet=request.args.get("neu_berechnet", type=int),
+        knapp_anzahl=knapp_anzahl,
     )
 
 
@@ -774,6 +793,54 @@ def text_auswerten():
         return jsonify(ok=False, fehler="Kein Text eingefügt."), 400
     werte, zweifel = texterkennung.analysieren(text)
     return jsonify(ok=True, werte=werte, zweifel=zweifel, text=text[:4000])
+
+
+@app.route("/bestand", methods=["GET", "POST"])
+def bestand():
+    """Bestand und Reichweite je Sorte; Lieferung eintragen (Erwachsene), auf die Einkaufsliste (alle)."""
+    con = db()
+    try:
+        s = schwellen.laden(con)
+        zeilen = bestand_modul.uebersicht(con, s["nachkaufen_tage"])
+        ek = einkauf.laden(con)
+        fehler = meldung = None
+        if request.method == "POST":
+            aktion = request.form.get("aktion")
+            if aktion == "auffuellen":
+                if not darf_aendern():
+                    abort(403)
+                lieferung, fehler = bestand_modul.lieferung_aus_formular(request.form, [z["id"] for z in zeilen])
+                if not fehler:
+                    n = bestand_modul.auffuellen(con, lieferung)
+                    return redirect(url_for("bestand", aufgefuellt=n))
+            elif aktion == "einkauf":
+                wahl = request.form.get("produkt_id")
+                ziel = [z for z in zeilen if (z["knapp"] if wahl == "knapp" else str(z["id"]) == wahl)]
+                if not ziel:
+                    fehler = "Keine passende Sorte."
+                else:
+                    try:
+                        neu, schon = einkauf.hinzufuegen(SUPERVISOR_TOKEN, ek["liste"], [einkauf.eintrag(z) for z in ziel])
+                        # manuell eingetragene Sorten nicht noch einmal automatisch melden
+                        einkauf.speichern(con, gemeldet=ek["gemeldet"] | {z["id"] for z in ziel if z["knapp"]})
+                        return redirect(url_for("bestand", eingetragen=neu, schon=schon))
+                    except einkauf.Fehler as exc:
+                        fehler = str(exc)
+            else:
+                fehler = "Unbekannte Aktion."
+        if request.args.get("aufgefuellt"):
+            meldung = f"Lieferung gespeichert ({request.args.get('aufgefuellt')} Sorten)."
+        elif request.args.get("eingetragen") is not None:
+            neu, schon = request.args.get("eingetragen", type=int) or 0, request.args.get("schon", type=int) or 0
+            meldung = (f"{neu} auf die Einkaufsliste gesetzt." if neu else "Nichts Neues eingetragen.") + \
+                (f" {schon} stand schon drauf." if schon else "")
+        return render_template(
+            "bestand.html", tab="futter", titel="Bestand", zeilen=zeilen, fehler=fehler, meldung=meldung,
+            nachkaufen_tage=s["nachkaufen_tage"], einkaufsliste=ek["liste"], automatisch=ek["automatisch"],
+            form=request.form if fehler else None,
+        ), (400 if fehler else 200)
+    finally:
+        con.close()
 
 
 @app.get("/kosten")

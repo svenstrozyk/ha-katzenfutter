@@ -33,6 +33,8 @@ wirklich. Mobile-first, als Panel in der HA-Seitenleiste, auch für Benutzer ohn
 - **Vorlieben:** Lieblingsfutter und „wird nicht gemocht“ je Sorte, Marke, Textur und Hauptprotein – gerechnet gegen
   die übliche Akzeptanz über alle Futter, damit ein schlechter Tag nicht als Abneigung gilt.
 - **Kosten:** je Tag, Monat und Sorte, Preisvergleich je 100 kcal.
+- **Bestand & Einkauf:** Reichweite je Sorte aus dem Verbrauch, „bald nachkaufen“, Lieferung für mehrere Sorten
+  in einem Rutsch, knappe Sorten mit einem Tipp oder automatisch auf die Einkaufsliste von Home Assistant.
 
 **Futterdatenbank**
 - Barcode per Live-Kamera, Foto oder EAN-Eingabe; Produktdaten aus [Open Pet Food Facts](https://world.openpetfoodfacts.org).

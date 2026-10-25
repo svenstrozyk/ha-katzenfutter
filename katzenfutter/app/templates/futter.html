@@ -11,6 +11,7 @@
 <a class="button" href="scan">Barcode scannen</a>
 <a class="button sekundaer" href="produkt">Futter ohne Barcode anlegen</a>
 {% endif %}
+<a class="button sekundaer" href="bestand">Bestand &amp; Einkauf{% if knapp_anzahl %} · {{ knapp_anzahl }} knapp{% endif %}</a>
 <a class="button sekundaer" href="kosten">Kosten</a>
 
 {% if not liste %}

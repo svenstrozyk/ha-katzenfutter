@@ -138,7 +138,12 @@
     <div class="row"><label for="bestand_angebrochen_g">Angebrochen (g)</label>
       <input type="text" inputmode="decimal" id="bestand_angebrochen_g" name="bestand_angebrochen_g"
              value="{% if form is not none %}{{ form.get('bestand_angebrochen_g', '') }}{% elif p and p.angebrochen_g %}{{ p.angebrochen_g | de(0) }}{% endif %}" placeholder="0"></div>
+    <div class="row"><label for="mindestbestand">Nachkaufen ab (Packungen)</label>
+      <input type="text" inputmode="numeric" id="mindestbestand" name="mindestbestand"
+             value="{% if form is not none %}{{ form.get('mindestbestand', '') }}{% elif p and p.mindestbestand is not none %}{{ p.mindestbestand }}{% endif %}" placeholder="nach Reichweite"></div>
   </div>
+  <p class="note">Leer: knapp, wenn der Bestand beim üblichen Verbrauch weniger als die eingestellten Tage reicht.
+    Lieferungen für mehrere Sorten trägt man am schnellsten unter Futter → Bestand ein.</p>
   <p class="note">„gesperrt“ nur nach eigener Entscheidung, z. B. wenn die Katze die Sorte dauerhaft ablehnt.</p>
   {% if darf_aendern %}<button type="submit">Speichern</button>{% endif %}
   </fieldset>

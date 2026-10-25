@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<p><a class="link" href="futter">‹ Futter</a></p>
+<h1>Bestand</h1>
+{% if meldung %}<div class="meldung ok" role="status">{{ meldung }}</div>{% endif %}
+{% if fehler %}<div class="meldung err" role="alert">{{ fehler }}</div>{% endif %}
+
+{% set knappe = zeilen | selectattr('knapp') | list %}
+{% if knappe %}
+<h2>Bald nachkaufen</h2>
+<div class="card">
+  {% for z in knappe %}
+  <div class="row"><span class="label">{{ z.bezeichnung }}<br><span class="muted" style="font-size: 14px;">
+    {{ z.packungen }} {{ 'Packung' if z.packungen == 1 else 'Packungen' }}{% if z.angebrochen_g %} + {{ z.angebrochen_g | gramm }} g{% endif %}
+    {%- if z.reichweite_tage is not none %} · reicht ≈ {{ z.reichweite_tage | de(0) }} {{ 'Tag' if (z.reichweite_tage | round) == 1 else 'Tage' }}{% endif %}</span></span>
+    {% if einkaufsliste %}
+    <form method="post" action="bestand" style="margin: 0;">
+      <input type="hidden" name="aktion" value="einkauf"><input type="hidden" name="produkt_id" value="{{ z.id }}">
+      <button type="submit" class="chip">Auf Einkaufsliste</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% if einkaufsliste and knappe | length > 1 %}
+<form method="post" action="bestand">
+  <input type="hidden" name="aktion" value="einkauf"><input type="hidden" name="produkt_id" value="knapp">
+  <button type="submit" class="button sekundaer">Alle {{ knappe | length }} auf die Einkaufsliste</button>
+</form>
+{% endif %}
+{% if not einkaufsliste %}<p class="note">Einkaufsliste in den <a class="link" href="einstellungen">Einstellungen</a> wählen,
+  dann lassen sich knappe Sorten mit einem Tipp eintragen.</p>
+{% elif automatisch %}<p class="note">Knappe Sorten kommen automatisch auf die Einkaufsliste.</p>{% endif %}
+{% endif %}
+
+<form method="post" action="bestand" id="lieferung">
+  <input type="hidden" name="aktion" value="auffuellen">
+  <h2>Alle Sorten</h2>
+  <div class="card">
+    {% for z in zeilen %}
+    <div class="row"><span class="label">{{ z.bezeichnung }}
+      {% if z.knapp %}<span class="tag" style="color: var(--warn); border-color: var(--warn);">knapp</span>{% endif %}<br>
+      <span class="muted" style="font-size: 14px;">
+        {% if not z.packungen and not z.angebrochen_g %}nicht vorrätig{% else %}{{ z.packungen }} {{ 'Packung' if z.packungen == 1 else 'Packungen' }}{% if z.angebrochen_g %} + {{ z.angebrochen_g | gramm }} g{% endif %}{% endif %}
+        {%- if z.reichweite_tage is not none %} · ≈ {{ z.reichweite_tage | de(0) }} Tage{% elif not z.packung_g %} · Packungsgröße fehlt{% else %} · kein Verbrauch{% endif %}
+        {%- if z.mindestbestand is not none %} · ab {{ z.mindestbestand }} nachkaufen{% endif %}</span></span>
+      {% if darf_aendern %}
+      <span class="plus" style="display: flex; align-items: center; gap: 4px;">
+        <button type="button" class="chip schritt" data-schritt="-1" aria-label="eine Packung weniger" style="min-width: 44px; padding: 0;">−</button>
+        <input type="text" inputmode="numeric" name="plus_{{ z.id }}" aria-label="Packungen dazu: {{ z.bezeichnung }}"
+               value="{{ form.get('plus_' ~ z.id, '') if form is not none else '' }}" placeholder="+0" style="width: 2.4em; text-align: center;">
+        <button type="button" class="chip schritt" data-schritt="1" aria-label="eine Packung mehr" style="min-width: 44px; padding: 0;">+</button>
+      </span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% if darf_aendern %}
+  <button type="submit">Lieferung speichern</button>
+  <p class="note">Je Sorte die gekauften Packungen eintragen, dann einmal speichern. Negative Zahl korrigiert nach unten.
+    Angebrochene Mengen und Mindestbestand ändern: Sorte im Tab Futter öffnen.</p>
+  {% else %}
+  <p class="note">Lieferungen tragen Erwachsene ein.</p>
+  {% endif %}
+  <p class="note">Reichweite aus dem Verbrauch der letzten 14 Tage (alle Katzen). Knapp: reicht unter {{ nachkaufen_tage }} Tage
+    oder Mindestbestand erreicht. Schwelle in den <a class="link" href="einstellungen">Einstellungen</a>.</p>
+</form>
+<script>
+  document.querySelectorAll('.schritt').forEach(b => b.addEventListener('click', () => {
+    const feld = b.parentElement.querySelector('input');
+    const wert = (parseInt(feld.value.replace('+', ''), 10) || 0) + parseInt(b.dataset.schritt, 10);
+    feld.value = wert === 0 ? '' : (wert > 0 ? '+' + wert : String(wert));
+  }));
+</script>
+{% endblock %}
