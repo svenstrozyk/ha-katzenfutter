@@ -51,19 +51,37 @@
 {% else %}
 <form method="post" action="fuettern" id="fuetterung">
   <h2>Futter</h2>
-  <div class="card">
-    {% set gewaehlt = (form.get('produkt_id') | int) if form is not none else gewaehlt_id %}
-    {% for p in auswahl %}
-    <label class="row" style="cursor: pointer;">
+  {% set gewaehlt = (form.get('produkt_id') | int) if form is not none else gewaehlt_id %}
+  {% macro sorte_zeile(p) %}
+    <label class="row sorte" style="cursor: pointer;" data-suche="{{ (bezeichnung(p) ~ ' ' ~ (p.marke or '')) | lower }}">
       <span class="label">{{ bezeichnung(p) }}<br><span class="muted" style="font-size: 14px;">
-        {% if p.angebrochen_g %}angebrochen {{ p.angebrochen_g | gramm }} g · {% endif %}{{ p.packungen or 0 }} {{ 'Packung' if (p.packungen or 0) == 1 else 'Packungen' }}
+        {% if p.angebrochen_g %}angebrochen {{ p.angebrochen_g | gramm }} g · {% endif %}
+        {%- if not p.packungen and not p.angebrochen_g %}nicht vorrätig{% else %}{{ p.packungen or 0 }} {{ 'Packung' if (p.packungen or 0) == 1 else 'Packungen' }}{% endif %}
         {%- if p.packung_g %} à {{ p.packung_g | gramm }} g{% endif %}</span></span>
       <input type="radio" name="produkt_id" value="{{ p.id }}" style="width: 24px; height: 24px; accent-color: var(--accent);"
              data-packung="{{ p.packung_g or '' }}" data-angebrochen="{{ p.angebrochen_g or '' }}"
              {% if p.id == gewaehlt %}checked{% endif %}>
     </label>
-    {% endfor %}
+  {% endmacro %}
+  <div class="card">
+    {% for p in oben %}{{ sorte_zeile(p) }}{% endfor %}
   </div>
+  {% if weitere %}
+  <details class="weitere" {% if weitere | selectattr('id', 'equalto', gewaehlt) | list %}open{% endif %}>
+    <summary class="button sekundaer">Weitere Sorten ({{ weitere | length }})</summary>
+    {% if weitere | length > 6 %}
+    <div class="card"><div class="row"><label for="suche">Suchen</label>
+      <input type="search" id="suche" placeholder="Sorte oder Marke" autocomplete="off"
+             style="font: inherit; color: var(--text); background: transparent; border: 0; text-align: right; min-height: 44px; width: 60%;"></div></div>
+    {% endif %}
+    {% for marke, gruppe in weitere | groupby('marke') %}
+    <div class="gruppe">
+      <h2>{{ marke or 'Ohne Marke' }}</h2>
+      <div class="card">{% for p in gruppe | sort(attribute='vorraetig', reverse=true) %}{{ sorte_zeile(p) }}{% endfor %}</div>
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
   <a class="button sekundaer" href="scan?ziel=fuettern">Barcode scannen</a>
 
   <h2>Menge</h2>
@@ -106,6 +124,10 @@
 <style>
   .warn { color: var(--warn); }
   .geschaetzt { font-style: italic; }
+  details.weitere > summary { list-style: none; }
+  details.weitere > summary::-webkit-details-marker { display: none; }
+  details.weitere[open] > summary { margin-bottom: 0; }
+
 </style>
 <script>
   // Schnellwahl der Menge passend zum gewählten Futter; ohne JavaScript bleibt das Eingabefeld
@@ -131,10 +153,25 @@
       b.addEventListener('click', () => { feld.value = de(wert); schnellwahl(false); });
       leiste.appendChild(b);
     }
-    if (vorbelegen && optionen.length) { feld.value = de(optionen[0][1]); schnellwahl(false); }
+    // Vorgabe: ganze Packung; ohne Packungsgröße der Rest der angebrochenen
+    const vorgabe = packung > 0 ? packung : (optionen.length ? optionen[0][1] : null);
+    if (vorbelegen && vorgabe) { feld.value = de(vorgabe); schnellwahl(false); }
   }
   document.querySelectorAll('input[name=produkt_id]').forEach(r => r.addEventListener('change', () => schnellwahl(true)));
   feld && feld.addEventListener('input', () => schnellwahl(false));
   if (feld) schnellwahl(!feld.value);
+  // Suche in „Weitere Sorten“: blendet nicht passende Sorten und leere Marken aus
+  const suche = document.getElementById('suche');
+  suche && suche.addEventListener('input', () => {
+    const begriff = suche.value.trim().toLowerCase();
+    document.querySelectorAll('.weitere .gruppe').forEach(g => {
+      let sichtbar = 0;
+      g.querySelectorAll('.sorte').forEach(z => {
+        const treffer = !begriff || z.dataset.suche.includes(begriff);
+        z.hidden = !treffer; sichtbar += treffer;
+      });
+      g.hidden = sichtbar === 0;
+    });
+  });
 </script>
 {% endblock %}

@@ -18,6 +18,27 @@ def produkte_zum_fuettern(con):
     ).fetchall()
 
 
+OBEN_MAX = 4
+
+
+def auswahl_aufteilen(auswahl, oben_max=OBEN_MAX):
+    """Teilt die Futterliste: oben angebrochene und zuletzt gefütterte vorrätige Sorten (höchstens oben_max),
+    der Rest als „weitere“ (je Eintrag mit Schlüssel vorraetig für die Sortierung innerhalb der Marke).
+
+    Ist noch nichts gefüttert, stehen oben die ersten vorrätigen Sorten. Nicht vorrätige kommen nie nach oben,
+    außer es gibt gar keine vorrätigen.
+    """
+    def vorraetig(p):
+        return bool(p["packungen"] or p["angebrochen_g"])
+
+    kandidaten = [p for p in auswahl if vorraetig(p)] or list(auswahl)
+    oben = kandidaten[:oben_max]
+    oben_ids = {p["id"] for p in oben}
+    weitere = sorted((dict(p, vorraetig=vorraetig(p)) for p in auswahl if p["id"] not in oben_ids),
+                     key=lambda p: ((p["marke"] or "").lower(), (p["sorte"] or "").lower()))
+    return oben, weitere
+
+
 def fuettern(con, katze_id, produkt, menge_g, zeitpunkt, person, erfasst_von=None):
     """Speichert eine Mahlzeit und schreibt den Bestand fort. Rückgabe: (mahlzeit_id, hinweise)."""
     hinweise = []

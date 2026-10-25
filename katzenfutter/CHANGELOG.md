@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.0 – 2026-10-25
+
+- Füttern: Menge steht standardmäßig auf einer ganzen Packung (auch wenn eine Packung angebrochen ist;
+  der Bestand nimmt zuerst die angebrochene)
+- Füttern: kürzere Sortenliste. Oben höchstens vier vorrätige Sorten (angebrochene zuerst, dann zuletzt
+  gefüttert), alle übrigen unter „Weitere Sorten“ nach Marke gruppiert, nicht vorrätige zuletzt; ab sieben
+  weiteren Sorten mit Suchfeld
+
 ## 0.24.0 – 2026-10-25
 
 - Zum Teilen vorbereitet: keine persönlichen Vorgaben mehr. Neue Installationen beginnen mit einer Katze „Katze“

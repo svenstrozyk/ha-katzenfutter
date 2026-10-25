@@ -182,3 +182,38 @@ def test_scan_aus_fuettern_waehlt_sorte(client):
     assert r.headers["Location"].endswith("/fuettern?produkt_id=1")
     html = c.get("/scan?ziel=fuettern", headers=HEADERS).get_data(as_text=True)
     assert 'name="ziel" value="fuettern"' in html
+
+
+def test_lange_liste_wird_aufgeteilt(client):
+    c, mod = client
+    for i in range(8):
+        futter(c, sorte=f"Sorte {i}", marke="Animonda" if i < 5 else "Carny")
+    futter(c, sorte="Leer", packungen="0")
+    fuettern(c, produkt_id=3, menge="40")  # angebrochen → oben zuerst
+    oben, weitere = mod.mahlzeiten.auswahl_aufteilen(mod.mahlzeiten.produkte_zum_fuettern(mod.db()))
+    assert len(oben) == 4 and oben[0]["id"] == 3
+    assert all(p["packungen"] or p["angebrochen_g"] for p in oben)
+    assert len(weitere) == 5 and {p["sorte"] for p in weitere} >= {"Leer"}
+    leer = next(p for p in weitere if p["sorte"] == "Leer")
+    assert leer["vorraetig"] is False
+    html = c.get("/fuettern", headers=HEADERS).get_data(as_text=True)
+    assert "Weitere Sorten (5)" in html and 'id="suche"' not in html  # Suche erst ab 7 weiteren
+    assert "nicht vorrätig" in html and "<h2>Carny</h2>" in html
+    assert html.count('type="radio"') == 9 and html.count("checked>") == 1
+    assert '<details class="weitere" open>' not in html  # gewählt ist eine Sorte von oben
+
+
+def test_gewaehlte_weitere_sorte_klappt_auf(client):
+    c, _ = client
+    for i in range(6):
+        futter(c, sorte=f"Sorte {i}")
+    html = c.get("/fuettern?produkt_id=6", headers=HEADERS).get_data(as_text=True)
+    assert '<details class="weitere" open>' in html
+
+
+def test_ohne_vorrat_stehen_trotzdem_sorten_oben(client):
+    c, mod = client
+    futter(c, sorte="A", packungen="0")
+    futter(c, sorte="B", packungen="0")
+    oben, weitere = mod.mahlzeiten.auswahl_aufteilen(mod.mahlzeiten.produkte_zum_fuettern(mod.db()))
+    assert len(oben) == 2 and weitere == []

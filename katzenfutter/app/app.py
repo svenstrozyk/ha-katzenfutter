@@ -497,6 +497,7 @@ def fuettern():
                 mahlzeit_id, hinweise = mahlzeiten.fuettern(con, tier["id"], produkt, menge, zeitpunkt, person, ha_user())
                 return redirect(url_for("fuettern", gespeichert=mahlzeit_id, hinweis=hinweise))
         gewaehlt_id = request.values.get("produkt_id", type=int)
+        oben, weitere = mahlzeiten.auswahl_aufteilen(auswahl)
         gespeichert = None
         if request.args.get("gespeichert", type=int):
             gespeichert = con.execute(
@@ -504,7 +505,8 @@ def fuettern():
                 "WHERE m.id = ?", (request.args.get("gespeichert", type=int),)).fetchone()
         return render_template(
             "fuettern.html", tab="fuettern", titel="Füttern", katze=tier, auswahl=auswahl, zeige_katzenwahl=True,
-            gewaehlt_id=gewaehlt_id or (auswahl[0]["id"] if auswahl else None),
+            oben=oben, weitere=weitere,
+            gewaehlt_id=gewaehlt_id or (oben[0]["id"] if oben else None),
             form=request.form if fehler else None, fehler=fehler,
             gespeichert=gespeichert, hinweise=request.args.getlist("hinweis"),
             rueckgaengig=mahlzeiten.rueckgaengig_moeglich(con, gespeichert) if gespeichert else False,
